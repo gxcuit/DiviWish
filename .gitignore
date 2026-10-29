@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+scripts/.dy_cache.json
+data/.history_cache/
+pictures/
+.DS_Store
+.conda/
+.venv/
+node_modules/
+# Also ignore the local runtime dependency symlink.
+node_modules
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# Personal workbooks and Excel lock files
+data/*.xlsx
+data/*.xlsm
+~$*
+
+# Local databases, snapshots and backups
+web/backend/data/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.bak

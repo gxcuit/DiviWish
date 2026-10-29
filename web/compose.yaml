@@ -1,0 +1,12 @@
+services:
+  diviwish:
+    build: .
+    image: diviwish:standalone
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - diviwish-data:/data
+    restart: unless-stopped
+
+volumes:
+  diviwish-data:

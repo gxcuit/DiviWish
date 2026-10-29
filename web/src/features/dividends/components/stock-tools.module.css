@@ -1,0 +1,37 @@
+.gridSection { margin: 18px 0 24px; }
+.basisSection { margin: 18px 0 24px; padding: 14px; background: #fafafa; border: 1px solid #edf0f2; border-radius: 12px; }
+.basisInputs { display: flex; gap: 12px; flex-wrap: wrap; }
+.basisInputs label { display: flex; flex-direction: column; flex: 1; min-width: 120px; gap: 6px; font-size: 12px; color: #737b88; }
+.basisInputs input, .basisInputs select { min-width: 0; width: 100%; padding: 9px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; color: #172033; font-size: 14px; }
+.heading { display: flex; gap: 7px; align-items: center; }
+.gridInputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.gridInputs label, .manager label { display: flex; flex-direction: column; gap: 6px; color: #737b88; font-size: 11px; }
+.gridInputs input, .manager input { min-width: 0; width: 100%; padding: 9px; color: #172033; font-size: 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
+.saveRow { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; }
+.saveRow small, .hint { font-size: 11px; line-height: 1.8; color: #9ca3af; }
+.primary { padding: 9px 12px; font-size: 12px; white-space: nowrap; color: white; background: #e03025; border-radius: 8px; }
+.gridTableWrap { max-height: 220px; overflow: auto; border: 1px solid #edf0f2; border-radius: 10px; }
+.gridTableWrap table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.gridTableWrap th, .gridTableWrap td { padding: 10px 12px; border-bottom: 1px solid #f0f1f3; text-align: right; }
+.gridTableWrap th:first-child, .gridTableWrap td:first-child { text-align: left; }
+.gridTableWrap th { position: sticky; top: 0; background: #fafafa; color: #9097a2; font-weight: 400; }
+.reached { color: #15803d; background: #f0fdf4; }
+.hint { margin-top: 10px; }
+.error, .success { margin: 12px 0; padding: 9px 12px; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+.error { background: #fff3ed; color: #b45309; }
+.success { background: #f0fdf4; color: #15803d; }
+.manager { padding: 8px 20px 20px; }
+.addSector { display: flex; gap: 10px; align-items: flex-end; margin: 20px 0; }
+.addSector label { flex: 1; }
+.sectorList { list-style: none; margin: 0; padding: 0; }
+.sectorList li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 0; border-top: 1px solid #f0f1f3; }
+.sectorList strong { font-size: 14px; font-weight: 500; }
+.sectorList small { display: block; margin-top: 2px; color: #9ca3af; font-size: 11px; }
+.rowActions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.rowActions button { font-size: 12px; white-space: nowrap; }
+.danger { color: #dc2626; }
+.renameSector { width: 100%; }
+.renameSector > .rowActions { margin-top: 10px; }
+.confirmDelete { position: sticky; bottom: 0; padding: 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fff5f5; box-shadow: 0 -5px 16px #ffffff; font-size: 13px; }
+.confirmDelete .rowActions { margin-top: 12px; }
+@media (max-width: 400px) { .gridInputs { gap: 6px; } .gridInputs label { font-size: 10px; } .gridInputs input { padding: 8px 6px; } .gridTableWrap td, .gridTableWrap th { padding: 9px 8px; } }

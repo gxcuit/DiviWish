@@ -1,0 +1,12 @@
+.root { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5; background: white; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px #17203318; overflow: hidden; }
+.list { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; }
+.option { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+.option:hover, .option.active { background: #fff2f0; }
+.option > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.option strong { font-size: 13px; font-weight: 500; color: #172033; }
+.option small { font-size: 10px; font-weight: 400; color: #9ca3af; white-space: nowrap; }
+.identity { flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.identity b { font-size: 12px; font-weight: 400; color: #6b7280; font-variant-numeric: tabular-nums; }
+.hint { padding: 8px 12px; font-size: 11px; color: #9ca3af; background: #fafafa; line-height: 1.6; }
+@media (max-width: 400px) { .option > span:first-child { flex-wrap: wrap; gap: 2px 6px; } .list { max-height: 180px; } }

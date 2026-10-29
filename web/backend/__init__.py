@@ -1,0 +1,1 @@
+"""Local dividend tracking service."""

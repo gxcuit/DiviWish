@@ -1,0 +1,10 @@
+.root { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.control { position: relative; }
+.control input[name="sector"] { padding-right: 42px; }
+.control > button { position: absolute; right: 0; top: 0; bottom: 0; width: 40px; display: grid; place-items: center; color: #6b7280; }
+.dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5; background: white; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px #17203318; overflow: hidden; }
+.list { max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
+.option { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; color: #172033; text-align: left; font-size: 13px; }
+.option:hover, .option.active { background: #fff2f0; }
+.option[aria-selected="true"] { color: #e03025; }
+.hint { background: #fafafa; color: #9ca3af; font-size: 11px; line-height: 1.6; padding: 7px 12px; }

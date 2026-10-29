@@ -1,0 +1,44 @@
+.section { margin: 22px 0 26px; }
+.heading, .heading h3, .heading button, .frameHeading, .quote { display: flex; align-items: center; }
+.heading { justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.heading h3 { flex-wrap: wrap; gap: 7px; margin: 0; font-size: 15px; }
+.heading h3 span { color: #9097a2; font-size: 11px; font-weight: 400; }
+.heading button { gap: 5px; padding: 6px 8px; color: #737b88; font-size: 12px; white-space: nowrap; }
+.heading button:disabled { opacity: .5; }
+.quote { justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: #737b88; }
+.quote strong { color: #e03025; font-size: 16px; margin-left: 5px; font-variant-numeric: tabular-nums; }
+.quote small { font-size: 10px; color: #9097a2; }
+.periodPicker { display: flex; gap: 3px; width: fit-content; margin: 0 0 12px; padding: 3px; border: 1px solid #edf0f2; border-radius: 9px; background: #f4f5f7; }
+.periodPicker label { position: relative; cursor: pointer; }
+.periodPicker input, .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.periodPicker span { display: block; padding: 6px 19px; border-radius: 6px; color: #737b88; font-size: 12px; transition: background .15s, color .15s; }
+.periodPicker input:checked + span { background: white; color: #e03025; font-weight: 600; box-shadow: 0 1px 4px #17203312; }
+.periodPicker input:focus-visible + span { outline: 2px solid #e03025; outline-offset: 2px; }
+.frames { display: grid; gap: 10px; }
+.frame { padding: 14px 16px 11px; border: 1px solid #edf0f2; border-radius: 12px; background: #fcfcfd; min-width: 0; }
+.frameHeading { justify-content: space-between; gap: 8px; }
+.frameHeading h4 { margin: 0; color: #172033; font-size: 13px; }
+.position { font-size: 10px; color: #65748d; padding: 3px 7px; border-radius: 5px; background: #eff2f7; }
+.outside { background: #fff0e8; color: #b96526; }
+.axis { display: block; width: 100%; height: auto; overflow: visible; font-variant-numeric: tabular-nums; }
+.currentMarker { color: #e03025; }
+.currentMarker text { fill: currentColor; font-size: 16px; font-weight: 600; }
+.levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 8px; }
+.levels > div:nth-child(2) { text-align: center; }
+.levels > div:last-child { text-align: right; }
+.levels dt { color: #9097a2; font-size: 10px; }
+.levels dd { margin: 4px 0 0; color: #384457; font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.levels i { display: inline-block; width: 5px; height: 5px; margin-right: 4px; border-radius: 50%; vertical-align: 2px; }
+.lowerDot { background: #4b89c8; }
+.middleDot { background: #c58b27; }
+.upperDot { background: #8b6db5; }
+.caption { margin: 11px 0 0; font-size: 10px; color: #9ca3af; line-height: 1.6; }
+.loading, .unavailable { font-size: 12px; color: #9097a2; padding: 12px 0; line-height: 1.7; }
+.error { padding: 9px 12px; font-size: 12px; color: #b45309; background: #fff3ed; border-radius: 8px; }
+.explanation { margin-top: 12px; font-size: 10px; line-height: 1.8; color: #9097a2; }
+.explanation summary { cursor: pointer; }
+.explanation p { margin: 7px 0; }
+.explanation a { text-decoration: underline; }
+.spinning { animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 400px) { .frame { padding: 12px 10px 10px; } .heading h3 { font-size: 14px; } .heading h3 span { font-size: 10px; } .levels dd { font-size: 12px; } }

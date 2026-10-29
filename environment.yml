@@ -1,0 +1,12 @@
+name: dividend-tracker
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - openpyxl
+  - requests
+  - pillow
+  - pip:
+      - akshare==1.19.1

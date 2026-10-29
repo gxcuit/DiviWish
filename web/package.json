@@ -1,0 +1,55 @@
+{
+  "name": "diviwish-web",
+  "version": "0.6.1",
+  "private": true,
+  "description": "A/H 股息观察单机版：本地 SQLite，无需登录",
+  "author": "JCodesMore",
+  "license": "MIT",
+  "keywords": [
+    "dividend",
+    "fenhong",
+    "nextjs",
+    "sqlite",
+    "standalone"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local scripts/dev.mjs",
+    "dev:web": "next dev --hostname 127.0.0.1",
+    "backend": "node --env-file-if-exists=.env.local scripts/backend.mjs",
+    "build": "node scripts/build.mjs",
+    "start": "node --env-file-if-exists=.env.local scripts/preview.mjs",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit && tsc -p worker/tsconfig.json",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:runtime",
+    "dev:legacy": "node scripts/dev-legacy.mjs",
+    "backend:legacy": "node scripts/backend-legacy.mjs",
+    "test": "node --experimental-strip-types --test worker/tests/*.test.ts",
+    "db:migrate:local": "node --env-file-if-exists=.env.local scripts/migrate-local.mjs",
+    "test:runtime": "node scripts/test-runtime.mjs"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.6.0",
+    "next": "16.3.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "shadcn": "^4.1.0",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
