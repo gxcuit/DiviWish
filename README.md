@@ -14,6 +14,22 @@ Next.js 16 · React 19 · TypeScript · Node.js 24 · 本地 SQLite
 
 </div>
 
+## 版本与分支选择
+
+单机版和多人版均维护在本仓库，按使用方式选择分支：
+
+| 分支 | 适合场景 | 账号与存储 |
+| --- | --- | --- |
+| [main](https://github.com/gxcuit/DiviWish/tree/main) | 个人本机使用，单机稳定版 | 无需登录注册，本地 SQLite，支持 npm / Docker |
+| [multi-user](https://github.com/gxcuit/DiviWish/tree/multi-user) | 多人使用，账号稳定版 | 邮箱密码或 LinuxDO 登录、注册与用户数据隔离；本地 SQLite / Cloudflare D1 |
+| [codex/standalone](https://github.com/gxcuit/DiviWish/tree/codex/standalone) | 单机版开发 | 对应 `main` 的开发分支 |
+| [develop](https://github.com/gxcuit/DiviWish/tree/develop) | 多人版开发 | 对应 `multi-user` 的集成分支 |
+
+首次下载单机版可运行 `git clone --branch main https://github.com/gxcuit/DiviWish.git`；多人版将 `--branch main` 改为 `--branch multi-user`。安装与部署请阅读所选分支的 [web/README.md](web/README.md)。
+
+原 `DiviWish-private` 仓库已停用。通用功能与 bug 修复同步维护两版，各版专属的账号、数据库与部署逻辑分别保留。详细约定见 [分支说明](web/docs/branches.md) 和 [项目记忆](MEMORY.md)。
+
+
 ## 可以做什么
 
 | 功能 | 说明 |
@@ -73,7 +89,7 @@ Next.js 16 · React 19 · TypeScript · Node.js 24 · 本地 SQLite
 3. 点击“获取当前价格与股息”，核对资料、设置板块与目标股息率后保存。
 4. 用星标整理自选；点击股票查看 BOLL、股息率网格、历史分位和分红明细，也可进入“收益”或“日历”继续观察。
 
-此分支为 `codex/standalone`，与原账号版分别维护。原个人数据库、备份与账号数据保留；单机版默认使用独立的本地数据库。
+当前页面介绍单机版；多人版见本仓库的 `multi-user` 分支。个人数据库、备份与账号数据保留，两版使用独立数据库。
 
 ## 数据与计算口径
 
@@ -136,5 +152,9 @@ DiviWish/
 - [Excel 股息跟踪流程](docs/excel-workflow.md)
 
 网站检查命令在 `web/` 运行：`npm run check`。包含 lint、类型检查、业务与存储回归、静态构建和本地 HTTP 持久化检查。
+
+## 致谢
+
+感谢 [LINUX DO（LinuxDO）社区](https://linux.do/) 的开放交流与技术分享。多人版支持 LinuxDO 授权登录，感谢社区提供的交流平台与连接机会。
 
 项目许可证见 [LICENSE](LICENSE)，第三方许可声明保留在相应目录。

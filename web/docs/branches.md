@@ -1,16 +1,18 @@
-# 仓库与分支约定
+# 版本与分支维护
 
-长期维护规则见根目录 [MEMORY.md](../../MEMORY.md)，后续修改前先核对仓库与分支。
+唯一维护仓库为 [gxcuit/DiviWish](https://github.com/gxcuit/DiviWish)。完整长期规则见 [MEMORY.md](../../MEMORY.md)。原 `DiviWish-private` 已停用，不再开发或推送，旧仓库保留。
 
-| 仓库 | 版本 | 分支 |
+| 分支 | 版本 | 用途与运行方式 |
 | --- | --- | --- |
-| [gxcuit/DiviWish](https://github.com/gxcuit/DiviWish) | 无登录的本地 SQLite 单机版，npm / Docker 运行 | `main` 为稳定版，`codex/standalone` 为单机工作分支 |
-| [gxcuit/DiviWish-private](https://github.com/gxcuit/DiviWish-private) | 登录、注册及用户隔离账号版 | `main` 为稳定版，`develop` 为集成分支，功能分支按账号版流程合入 |
+| [main](https://github.com/gxcuit/DiviWish/tree/main) | 单机版 | 稳定分支，无需登录，本地 SQLite，npm / Docker |
+| [codex/standalone](https://github.com/gxcuit/DiviWish/tree/codex/standalone) | 单机版 | 单机开发分支，检查通过后合入 `main` |
+| [multi-user](https://github.com/gxcuit/DiviWish/tree/multi-user) | 多人版 | 稳定分支，邮箱及 LinuxDO 登录、注册、会话、用户数据隔离；部署说明见该分支 `web/README.md` |
+| [develop](https://github.com/gxcuit/DiviWish/tree/develop) | 多人版 | 多人集成开发分支，检查通过后合入 `multi-user` |
 
-通用功能或 bug 修复必须在两个仓库及各自对应分支实现和验证。共用计算、行情和界面逻辑可以定向移植；涉及数据库、账号和运行环境的差异分别适配。单机版移除登录的改动不能整分支合入账号版。
+通用功能与 bug 修复必须分别在两版对应分支实现和验证。定向移植公共计算、行情与界面代码，适配各版数据库和账号模型，不整分支覆盖另一版。交付时记录两版分支、提交及验证结果。
 
-初次发布单机版以公开仓库现有提交为父提交，导入已检查的源码快照，不连接私有仓库历史。此工作目录的 `origin` 指向私有账号版，`legacy-origin` 指向公开单机版；上传前再次核对 URL，单机分支只推公开仓库。
+本地 `origin` 统一指向公开仓库。多人版首次迁入采用当前源码快照，以公开仓库提交为父提交，不连接原私有仓库提交历史。两版使用独立本地数据库，切换分支不代表数据转换，不共用同一个 SQLite 文件。
 
-网站所有开发与检查在 `web/` 进行，根目录 Excel 流程独立。运行 `npm run check` 验证类型、业务回归、构建与真实 HTTP/SQLite 持久化；Docker 另行构建和运行验证。
+所有网站开发及检查从 `web/` 运行。遵循当前分支的 `README.md` 与检查命令；单机版 Docker 需另行构建运行验证。根目录 Excel 流程独立；保留个人 SQLite、备份与快照，不提交真实密钥或数据。
 
-提交源码、依赖锁文件、迁移、测试、部署文件与文档，不提交个人数据库、快照、备份或账号配置。Git 推送不等于部署现有线上服务。
+推送代码不自动部署线上服务，也不迁移生产数据库。

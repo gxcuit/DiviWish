@@ -6,8 +6,8 @@
 - 网站开发与检查命令从 `web/` 运行，详见 `web/README.md`。迁移、清理和检查时保留 `web/backend/data/` 中的 SQLite、备份和初始快照。
 - 根 README 展示网站功能与截图；Excel 操作说明位于 `docs/excel-workflow.md`。
 
-## 跨仓库维护记忆
+## 版本维护记忆
 
 - 开始开发或发布前读取 [MEMORY.md](MEMORY.md)。
-- `gxcuit/DiviWish` 维护无登录的 SQLite 单机版；`gxcuit/DiviWish-private` 维护登录注册账号版。
-- 通用功能或 bug 修复必须在两个仓库及其对应分支分别实现、检查并同步，不得只完成一侧。
+- 两个版本统一维护在 `gxcuit/DiviWish`：`main` / `codex/standalone` 为单机版，`multi-user` / `develop` 为多人版；`DiviWish-private` 已停用。
+- 通用功能或 bug 修复必须在两版对应分支分别实现、检查并同步；专属功能按版本维护。

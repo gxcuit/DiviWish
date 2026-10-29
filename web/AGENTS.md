@@ -22,4 +22,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 使用 2 空格缩进、具名导出、严格类型，延续现有样式与计算口径。
 - 根目录 Excel 脚本和工作簿独立维护，不自动运行或导入。
 
-- 跨仓库归属及双端同步规则见 [项目记忆](../MEMORY.md)：单机版到公开 `gxcuit/DiviWish`，账号能力到私有 `gxcuit/DiviWish-private`；通用功能与 bug 修复两侧同时处理。
+- 版本归属及双端同步规则见 [项目记忆](../MEMORY.md)：唯一仓库为 `gxcuit/DiviWish`；单机版用 `main` / `codex/standalone`，多人版用 `multi-user` / `develop`；通用功能与 bug 修复两版同步，停用原私有仓库。
