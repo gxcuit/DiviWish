@@ -6,6 +6,8 @@
 
 线上地址：[DiviWish · 息望](https://diviwish.shaunko.tech)，[workers.dev 备用地址](https://diviwish.jackgao-china.workers.dev) 保留。生产部署、独立 D1、密钥管理与回退说明见 [Cloudflare 部署](docs/cloudflare-deployment.md)。
 
+当前工作机在 WSL 中构建与运行时，优先使用 [已验证的 WSL 构建与启动方式](docs/local-wsl.md)（Linux Node + webpack + 静态预览）；其中记录了完整命令、端口检查及平台依赖注意事项。
+
 ## 本地启动
 
 需要 Node.js 24+。所有命令从 `web/` 运行：

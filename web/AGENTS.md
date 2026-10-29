@@ -8,6 +8,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+当前工作机的 WSL 本地构建与启动优先遵循 [已验证的 WSL 流程](docs/local-wsl.md)：Linux Node / Linux 依赖、显式 `--webpack` 静态构建、`scripts/preview.mjs` 启动。先检查已有服务；源码未变时复用构建。下方 npm / Windows / Docker 命令为其他环境的通用入口。
+
 # DiviWish 网站
 
 本目录是 DiviWish 的 Web 应用；后续股息率网站改动都在这里进行。
