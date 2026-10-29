@@ -8,4 +8,4 @@ if errorlevel 1 (
 )
 call npm ci
 if errorlevel 1 exit /b 1
-echo Setup complete. Run run.cmd for the standalone app.
+echo Setup complete. Run run.cmd for local sign-in testing.

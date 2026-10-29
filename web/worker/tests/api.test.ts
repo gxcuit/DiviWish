@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createHandler } from "../index.ts";
+import { createHandler } from "../legacy.ts";
 import { fixture } from "./helpers.ts";
 
 test("stock CRUD, duplicates, light list and detailed history retain the API contract", async t => {
@@ -145,17 +145,23 @@ test("refresh applies no stale quote or freshness metadata when every fetched se
   assert.equal((await (await f.request("/api/stocks/1")).json()).price, null);
 });
 
-test("standalone API needs no login and protects same-origin JSON writes", async t => {
+test("cloud deployment requires login for API and assets, and protects same-origin writes", async t => {
   const f = fixture(); t.after(() => f.db.sqlite.close());
-  for (const route of ["/api/auth/login", "/api/auth/register", "/api/auth/session", "/api/auth/linuxdo/start"]) {
-    assert.equal((await f.request(route)).status, 404);
-  }
-  const write = (origin: string, extra = {}) => f.handler(new Request("http://localhost/api/refresh", {
-    method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...extra }, body: "{}",
+  const remote = (path: string, headers = {}) => f.handler(new Request("https://diviwish.example" + path, { headers }), f.env);
+  assert.equal((await remote("/api/health")).status, 503);
+  f.env.APP_USERNAME = "tester"; f.env.APP_PASSWORD = "secret";
+  assert.equal((await remote("/api/stocks")).status, 401);
+  assert.equal((await remote("/_next/app.js")).status, 401);
+  const auth = { Authorization: "Basic " + btoa("tester:secret") };
+  assert.equal((await remote("/api/health", auth)).status, 200);
+  assert.equal((await remote("/", auth)).status, 302);
+  const write = (origin: string, extra = {}) => f.handler(new Request("https://diviwish.example/api/refresh", {
+    method: "POST", headers: { ...auth, "Content-Type": "application/json", Origin: origin, ...extra }, body: "{}",
   }), f.env);
   assert.equal((await write("https://evil.example")).status, 403);
-  assert.equal((await write("http://localhost", { "Sec-Fetch-Site": "cross-site" })).status, 403);
-  assert.equal((await write("http://localhost")).status, 502);
+  assert.equal((await write("https://diviwish.example", { "Sec-Fetch-Site": "cross-site" })).status, 403);
+  assert.equal((await write("https://diviwish.example")).status, 502);
+  delete f.env.APP_USERNAME; delete f.env.APP_PASSWORD;
   assert.equal((await f.request("/api/refresh", "POST")).status, 415);
   assert.equal((await f.handler(new Request("http://localhost/api/stocks", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: "x".repeat(128 * 1024 + 1),

@@ -1,0 +1,64 @@
+.page { min-height:100svh; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:28px; padding:48px 20px; background:radial-gradient(ellipse at 12% 8%,#dfeee4 0,transparent 50%),#f6f8f5; color:#20372a; position:relative; overflow:hidden; }
+.decoration { position:absolute; right:-70px; bottom:-100px; color:#dae7db; transform:rotate(-18deg); pointer-events:none; }
+.decoration svg { width:440px; height:440px; stroke-width:.7; }
+.brand { display:flex; align-items:center; gap:10px; color:#28734d; font-size:19px; font-weight:750; letter-spacing:.03em; z-index:1; }
+.card { background:#fff; border:1px solid #e7ece5; border-radius:24px; box-shadow:0 18px 70px #183a2110; padding:38px; max-width:460px; width:100%; z-index:1; }
+.eyebrow { color:#63846b; font-size:12px; letter-spacing:.08em; }
+.card h1 { font-size:25px; letter-spacing:-.04em; line-height:1.45; font-weight:650; margin:13px 0; }
+.subtitle { font-size:14px; line-height:1.8; color:#788579; margin:0 0 28px; overflow-wrap:anywhere; }
+.label { display:flex; flex-direction:column; gap:9px; font-size:13px; font-weight:550; }
+.inputWrap { display:flex; gap:10px; align-items:center; border:1px solid #d9e2d8; padding:0 14px; border-radius:12px; color:#829085; }
+.inputWrap:focus-within { outline:2px solid #39865a; outline-offset:2px; }
+.inputWrap input { width:100%; border:0; background:transparent; outline:none; padding:15px 0; color:#263e2d; font-size:15px; }
+.code { border:1px solid #d9e2d8; border-radius:12px; padding:13px; text-align:center; font-size:28px; letter-spacing:.28em; width:100%; font-variant-numeric:tabular-nums; }
+.code:focus { outline:2px solid #39865a; outline-offset:2px; }
+.primary { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; border:0; border-radius:12px; padding:15px; margin-top:20px; background:#26734b; color:#fff; font-weight:550; font-size:14px; cursor:pointer; }
+.primary:hover:not(:disabled) { background:#1a603b; }
+.primary:disabled { opacity:.5; cursor:wait; }
+.actions { display:flex; justify-content:space-between; gap:12px; margin-top:18px; }
+.actions button { display:flex; align-items:center; gap:4px; font-size:12px; background:none; border:0; color:#467c55; cursor:pointer; padding:4px 0; }
+.actions button:disabled { opacity:.45; cursor:default; }
+.assurance { display:flex; align-items:center; justify-content:center; gap:7px; border-top:1px solid #edf0eb; padding-top:23px; margin-top:28px; color:#829082; font-size:11px; line-height:1.7; }
+.assurance svg { flex-shrink:0; }
+.local { font-size:11px; color:#8b7c54; background:#faf8ef; border-radius:8px; padding:10px 12px; line-height:1.7; margin-top:16px; }
+.error { font-size:13px; color:#a74038; background:#fff4f2; padding:10px 12px; border-radius:8px; margin-top:16px; line-height:1.7; }
+.notice { font-size:13px; color:#39734b; margin-top:15px; line-height:1.7; }
+.challenge { margin-top:18px; min-height:65px; }
+.footer { font-size:12px; color:#829082; z-index:1; }
+.loading { text-align:center; color:#63846b; font-size:14px; }
+.loading svg { margin:auto; }
+.loading p { margin-top:15px; }
+.spinning { animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media(max-width:480px) { .page { padding:30px 18px; gap:24px; } .card { padding:28px 23px; border-radius:20px; } .card h1 { font-size:23px; } .decoration { right:-180px; } }
+@media(prefers-reduced-motion:reduce) { .spinning { animation:none; } }
+.brand { text-decoration:none; }
+.form { display:flex; flex-direction:column; gap:17px; }
+.form .primary { margin-top:3px; }
+.form .error,.form .notice { margin:0; }
+.tabs { display:flex; gap:26px; margin:-6px 0 27px; border-bottom:1px solid #e8eee7; }
+.tabs a { text-decoration:none; color:#859083; padding:0 4px 12px; font-size:14px; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tabs a[aria-current="page"] { border-color:#28734d; color:#28734d; font-weight:650; }
+.visibility { display:flex; background:none; border:0; color:#839184; padding:8px 0 8px 7px; cursor:pointer; flex-shrink:0; }
+.inputWrap input { min-width:0; }
+.inputWrap input:read-only { color:#7a887a; }
+.codeRow { display:flex; border:1px solid #d9e2d8; border-radius:12px; overflow:hidden; align-items:center; }
+.codeRow:focus-within { outline:2px solid #39865a; outline-offset:2px; }
+.codeRow input { min-width:0; flex:1; border:0; outline:0; font-size:16px; padding:15px 13px; font-variant-numeric:tabular-nums; background:transparent; }
+.codeRow button { background:#f1f7f1; color:#39734b; border:0; border-left:1px solid #e0e9dd; padding:13px; font-size:12px; align-self:stretch; min-width:104px; cursor:pointer; }
+.codeRow button:disabled { color:#9ba898; cursor:default; }
+.passwordHelp { margin:-9px 0 0; color:#87927f; font-size:11px; line-height:1.6; }
+.formLinks { display:flex; gap:15px; align-items:center; justify-content:space-between; margin-top:18px; }
+.formLinks a,.formLinks button { color:#4b7d56; font-size:12px; text-decoration:none; line-height:1.7; }
+.formLinks a:hover { text-decoration:underline; }
+.formLinks button { background:none; border:0; cursor:pointer; padding:0; }
+
+.socialLogin { margin-top:22px; text-align:center; }
+.socialLogin > span { display:block; color:#87927f; font-size:12px; margin-bottom:15px; }
+.socialLogin a,.linuxdoLink { display:flex; gap:10px; align-items:center; justify-content:center; border:1px solid #d9e2d8; border-radius:12px; padding:13px; color:#263e2d; text-decoration:none; font-size:14px; background:#fff; cursor:pointer; width:100%; }
+.socialLogin a:hover,.linuxdoLink:hover { background:#f1f7f1; }
+.socialLogin a:focus-visible,.linuxdoLink:focus-visible { outline:2px solid #39865a; outline-offset:3px; }
+.socialLogin a[aria-disabled="true"],.linuxdoLink:disabled { opacity:.5; cursor:wait; }
+.socialLogin p,.linuxdoAccount p { font-size:11px; color:#788579; line-height:1.7; margin:10px 0; }
+.linuxdoMark { width:19px; height:19px; flex-shrink:0; border-radius:50%; background:linear-gradient(#242424 0 31%,#fff 31% 65%,#ffb900 65%); border:1px solid #e5e5e5; }
+.linuxdoAccount { margin:18px auto 0; max-width:320px; }

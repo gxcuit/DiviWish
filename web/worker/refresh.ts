@@ -1,4 +1,4 @@
-import type { SqliteDatabase, SqliteStatement } from "./types.ts";
+import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import { readRow } from "./database.ts";
 import { HttpError, json } from "./http.ts";
 import { timestamp } from "./validation.ts";
@@ -28,8 +28,8 @@ async function dividendSnapshots(records: StockRecord[], source: Providers, erro
   return snapshots;
 }
 
-/** Refresh the single local portfolio without overwriting concurrent edits. */
-export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], source: Providers) {
+/** Called only after the handler obtains the owner from a verified session. */
+export async function refreshStocks(db: D1Database, userId: string, records: StockRecord[], source: Providers) {
   if (!records.length) throw new HttpError(400, "请先添加股票");
   const errors: string[] = [];
   const [quoteResult, dividends, fxResult] = await Promise.all([
@@ -45,9 +45,9 @@ export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], 
     if (records.some(stock => stock.market === "HK") && fx === null) errors.push("汇率获取失败，沿用原汇率；无有效汇率时港股股息率仍不可计算");
   }
   const now = timestamp(), marker = crypto.randomUUID();
-  const changes: { stock: StockRecord; applyQuote: boolean; applyDividends: boolean; statement: SqliteStatement }[] = [];
+  const changes: { stock: StockRecord; applyQuote: boolean; applyDividends: boolean; statement: D1PreparedStatement }[] = [];
   for (const stock of records) {
-    const row = await db.prepare("SELECT * FROM stocks WHERE id=?").bind(stock.id!).first<StockRow>();
+    const row = await db.prepare("SELECT * FROM user_stocks WHERE user_id=? AND id=?").bind(userId, stock.id!).first<StockRow>();
     if (!row || row.code !== stock.code || row.market !== stock.market) {
       errors.push(`${stock.code}：刷新期间股票已修改或删除，跳过旧数据`); continue;
     }
@@ -62,22 +62,22 @@ export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], 
     if (applyDividends) Object.assign(patch, snapshot, { verification_note: null });
     Object.assign(patch, { updated_at: now, _refresh_id: marker,
       source: applyDividends ? `${applyQuote ? "腾讯实时行情；" : "报价来自保存数据；"}东方财富公开分红资料` : "腾讯实时行情；分红及历史来自保存数据" });
-    changes.push({ stock, applyQuote, applyDividends, statement: db.prepare("UPDATE stocks SET document=json_patch(document,?) " +
-      "WHERE id=? AND code=? AND market=? AND document=?")
-      .bind(JSON.stringify(patch), stock.id!, stock.code, stock.market, row.document) });
+    changes.push({ stock, applyQuote, applyDividends, statement: db.prepare("UPDATE user_stocks SET document=json_patch(document,?) " +
+      "WHERE user_id=? AND id=? AND code=? AND market=? AND document=?")
+      .bind(JSON.stringify(patch), userId, stock.id!, stock.code, stock.market, row.document) });
   }
   if (!changes.length) return json({ message: "刷新未更新任何数据，原值保持不变", updated: 0, quotes_updated: 0, dividends_updated: 0, errors }, 502);
-  const matched = "FROM stocks WHERE json_extract(document,'$._refresh_id')=?";
-  const setMeta = (key: string, value: unknown, filter = "") => db.prepare("INSERT INTO metadata(key,value) " +
-    `SELECT ?,? WHERE EXISTS(SELECT 1 ${matched}${filter}) ON CONFLICT(key) DO UPDATE SET value=excluded.value`)
-    .bind(key, JSON.stringify(value), marker);
+  const matched = "FROM user_stocks WHERE user_id=? AND json_extract(document,'$._refresh_id')=?";
+  const setMeta = (key: string, value: unknown, filter = "") => db.prepare("INSERT INTO user_metadata(user_id,key,value) " +
+    `SELECT ?,?,? WHERE EXISTS(SELECT 1 ${matched}${filter}) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value`)
+    .bind(userId, key, JSON.stringify(value), userId, marker);
   const metadata = [setMeta("last_refresh", now)];
   if (fx !== null) metadata.push(setMeta("fx_rate", fx, " AND market='HK'"));
   const quotedIds = JSON.stringify(changes.filter(change => change.applyQuote).map(change => change.stock.id));
-  metadata.push(db.prepare("INSERT INTO metadata(key,value) " +
-    `SELECT 'quote_date',json_quote(MAX(json_extract(document,'$.quote_date'))) ${matched} AND id IN (SELECT value FROM json_each(?)) ` +
-    "HAVING MAX(json_extract(document,'$.quote_date')) IS NOT NULL ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-    .bind(marker, quotedIds));
+  metadata.push(db.prepare("INSERT INTO user_metadata(user_id,key,value) " +
+    `SELECT ?,'quote_date',json_quote(MAX(json_extract(document,'$.quote_date'))) ${matched} AND id IN (SELECT value FROM json_each(?)) ` +
+    "HAVING MAX(json_extract(document,'$.quote_date')) IS NOT NULL ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value")
+    .bind(userId, userId, marker, quotedIds));
   const results = (await db.batch([...changes.map(change => change.statement), ...metadata])).slice(0, changes.length);
   const updated = results.filter(row => row.meta.changes > 0).length;
   const quotesUpdated = results.filter((row, index) => row.meta.changes > 0 && changes[index].applyQuote).length;

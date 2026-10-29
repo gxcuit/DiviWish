@@ -1,21 +1,28 @@
-// The local SQLite adapter supplies asynchronous statement methods to the API.
-export interface SqliteStatement {
-  bind(...values: (string | number | null)[]): SqliteStatement;
-  first<T = Record<string, unknown>>(column?: string): Promise<T | null>;
-  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>;
-  run(): Promise<SqliteResult>;
-}
-export interface SqliteResult {
-  meta: { changes: number; last_row_id: number };
-}
-export interface SqliteDatabase {
-  prepare(sql: string): SqliteStatement;
-  batch(statements: SqliteStatement[]): Promise<SqliteResult[]>;
-}
-export interface Env {
-  DB: SqliteDatabase;
-  APP_ORIGIN?: string;
+import type { D1Database } from "@cloudflare/workers-types";
+
+// Database/config bindings come from `npm run cf:types`; secrets stay optional so
+// missing configuration can fail closed with a useful response.
+export type Env = Pick<WorkerBindings, "DB" | "APP_ORIGIN" | "AUTH_EMAIL_MODE"> & Partial<Pick<WorkerBindings, "APP_ALLOWED_ORIGINS">> & {
   ASSETS?: { fetch(request: Request): Promise<Response> };
+  AUTH_SECRET?: string;
+  LINUXDO_CLIENT_ID?: string;
+  LINUXDO_CLIENT_SECRET?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM?: string;
+  RESEND_OTP_TEMPLATE_ID?: string;
+  RESEND_TEST_RECIPIENT?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+};
+
+export type User = { id: string; email: string | null; created_at: number; hasPassword: boolean; linuxdoUsername: string | null };
+
+// Archived D1 implementation, used only by historical regression tests.
+export interface LegacyEnv {
+  DB: D1Database;
+  ASSETS?: { fetch(request: Request): Promise<Response> };
+  APP_USERNAME?: string;
+  APP_PASSWORD?: string;
 }
 
 export interface StockRecord extends Record<string, unknown> {

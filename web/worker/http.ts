@@ -8,15 +8,15 @@ export const json = (value: unknown, status = 200, headers: HeadersInit = {}) =>
   status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers },
 });
 
-export function protectWrites(request: Request, configuredOrigin?: string) {
+export function protectWrites(request: Request, configuredOrigin: string) {
   if (!["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) return;
   const url = new URL(request.url), origin = request.headers.get("Origin");
-  const configured = new URL(configuredOrigin || url.origin);
-  const allowed = new Set([url.origin, configured.origin]);
-  for (const candidate of [url, configured]) {
-    if (!loopback(candidate.hostname)) continue;
-    const port = candidate.port ? `:${candidate.port}` : "";
-    for (const host of ["localhost", "127.0.0.1", "[::1]"]) allowed.add(`${candidate.protocol}//${host}${port}`);
+  const allowed = new Set([url.origin, new URL(configuredOrigin).origin]);
+  if (loopback(url.hostname) && loopback(new URL(configuredOrigin).hostname)) {
+    allowed.add("http://localhost:3000"); allowed.add("http://127.0.0.1:3000");
+    const localPort = url.port ? `:${url.port}` : "";
+    allowed.add(`${url.protocol}//localhost${localPort}`);
+    allowed.add(`${url.protocol}//127.0.0.1${localPort}`);
   }
   if (origin && !allowed.has(origin)) throw new HttpError(403, "仅允许同源页面提交请求");
   if (request.headers.get("Sec-Fetch-Site") === "cross-site") throw new HttpError(403, "不接受跨站写入请求");

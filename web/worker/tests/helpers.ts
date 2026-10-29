@@ -1,12 +1,12 @@
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import type { SqliteDatabase } from "../types.ts";
-import type { Env, Providers, StockRecord } from "../types.ts";
+import type { D1Database } from "@cloudflare/workers-types";
+import type { LegacyEnv, Providers, StockRecord } from "../types.ts";
 import { DEFAULT_STOCK } from "../validation.ts";
 import { document } from "../database.ts";
-import { createHandler } from "../index.ts";
+import { createHandler } from "../legacy.ts";
 
-// Real SQLite queries and transactions for API regressions. No personal files are used.
+// Real SQLite queries and transactions behind D1's async API. No personal files are used.
 export class TestDatabase {
   sqlite: DatabaseSync;
   constructor(filename = ":memory:") {
@@ -36,7 +36,7 @@ export class TestDatabase {
       return results;
     } catch (error) { this.sqlite.exec("ROLLBACK"); throw error; }
   }
-  get binding() { return this as unknown as SqliteDatabase; }
+  get binding() { return this as unknown as D1Database; }
 }
 
 export function sampleStocks(): StockRecord[] {
@@ -72,7 +72,7 @@ export function fixture(overrides: Partial<Providers> = {}) {
     fetchKline: async () => ({ bars: candles(), adjustment: "qfq", quote: { price: 28, quote_date: "2026-01-30" } }),
     ...overrides,
   };
-  const handler = createHandler(source), env: Env = { DB: db.binding };
+  const handler = createHandler(source), env: LegacyEnv = { DB: db.binding };
   const request = (path: string, method = "GET", body?: unknown, headers: Record<string, string> = {}) => handler(
     new Request(`http://localhost${path}`, { method, headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env);

@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "./types.ts";
+import type { D1Database } from "@cloudflare/workers-types";
 import { DEFAULT_STOCK } from "./validation.ts";
 import type { StockRecord, StockRow } from "./types.ts";
 
@@ -12,7 +12,7 @@ export function document(stock: StockRecord): string {
     !["id", "code", "market", "name", "sector", "watched"].includes(key))));
 }
 
-export async function initialize(db: SqliteDatabase) {
+export async function initialize(db: D1Database) {
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO sectors(name) SELECT sector FROM stocks GROUP BY sector ORDER BY MIN(id)"),
     db.prepare("INSERT OR IGNORE INTO sectors(name) VALUES('未分类')"),
@@ -20,33 +20,33 @@ export async function initialize(db: SqliteDatabase) {
   ]);
 }
 
-export async function rawStocks(db: SqliteDatabase): Promise<StockRecord[]> {
+export async function rawStocks(db: D1Database): Promise<StockRecord[]> {
   const rows = await db.prepare("SELECT * FROM stocks ORDER BY id").all<StockRow>();
   return rows.results.map(readRow);
 }
 
-export async function getStock(db: SqliteDatabase, id: number): Promise<StockRecord | undefined> {
+export async function getStock(db: D1Database, id: number): Promise<StockRecord | undefined> {
   const row = await db.prepare("SELECT * FROM stocks WHERE id=?").bind(id).first<StockRow>();
   return row ? readRow(row) : undefined;
 }
 
-export async function metadata(db: SqliteDatabase): Promise<Record<string, unknown>> {
+export async function metadata(db: D1Database): Promise<Record<string, unknown>> {
   const rows = await db.prepare("SELECT key,value FROM metadata").all<{ key: string; value: string }>();
   return Object.fromEntries(rows.results.map(row => [row.key, JSON.parse(row.value)]));
 }
 
-export function setMeta(db: SqliteDatabase, key: string, value: unknown) {
+export function setMeta(db: D1Database, key: string, value: unknown) {
   return db.prepare("INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
     .bind(key, JSON.stringify(value));
 }
 
-export async function sectorRecords(db: SqliteDatabase) {
+export async function sectorRecords(db: D1Database) {
   return (await db.prepare("SELECT sectors.id,sectors.name,count(stocks.id) AS stock_count FROM sectors " +
     "LEFT JOIN stocks ON stocks.sector=sectors.name GROUP BY sectors.id ORDER BY sectors.id")
     .all<{ id: number; name: string; stock_count: number }>()).results;
 }
 
-export async function saveStock(db: SqliteDatabase, stock: StockRecord, previous?: StockRecord) {
+export async function saveStock(db: D1Database, stock: StockRecord, previous?: StockRecord) {
   const serialized = document(stock);
   let update;
   // The stored JSON may predate defaults; compare the original bytes rather than reserializing them.

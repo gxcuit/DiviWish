@@ -61,10 +61,3 @@ temp/
 !.dev.vars.example
 backend/data/*.json
 backend/data/*.sql
-
-# SQLite files, including custom local paths and manual backups
-*.sqlite3*
-*.sqlite*
-*.db
-*.db-wal
-*.db-shm

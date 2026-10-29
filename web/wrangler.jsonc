@@ -1,0 +1,51 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "diviwish",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-27",
+  "assets": {
+    "directory": "./out",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "404-page"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "diviwish-accounts-local",
+    "database_id": "00000000-0000-0000-0000-000000000001",
+    "migrations_dir": "migrations",
+    "remote": false
+  }],
+  "vars": {
+    "APP_ORIGIN": "http://localhost:3000",
+    "AUTH_EMAIL_MODE": "resend"
+  },
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  },
+  "env": {
+    "production": {
+      "name": "diviwish",
+      "account_id": "257059339b4cc4e209c48fc4a70dd5fa",
+      "workers_dev": true,
+      "preview_urls": false,
+      "routes": [{ "pattern": "diviwish.shaunko.tech", "custom_domain": true }],
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "diviwish-accounts-production",
+        "database_id": "b7513e84-bf4a-49ab-963b-3dffc30c1307",
+        "migrations_dir": "migrations",
+        "remote": true
+      }],
+      "vars": {
+        "APP_ORIGIN": "https://diviwish.shaunko.tech",
+        "APP_ALLOWED_ORIGINS": "https://diviwish.jackgao-china.workers.dev",
+        "AUTH_EMAIL_MODE": "resend"
+      },
+      "secrets": {
+        "required": ["AUTH_SECRET", "RESEND_API_KEY", "RESEND_FROM", "RESEND_OTP_TEMPLATE_ID", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"]
+      }
+    }
+  }
+}

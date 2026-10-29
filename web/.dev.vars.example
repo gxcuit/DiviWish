@@ -1,0 +1,20 @@
+# Copy to .dev.vars. Never commit real keys.
+APP_ORIGIN=http://localhost:3000
+# Optional comma-separated HTTPS origins for other configured production domains.
+APP_ALLOWED_ORIGINS=
+AUTH_SECRET=
+# console: random codes printed to the local terminal only. resend: real emails.
+AUTH_EMAIL_MODE=console
+RESEND_API_KEY=
+RESEND_FROM="DiviWish 息望 <login@mail.example.com>"
+RESEND_OTP_TEMPLATE_ID=
+# Optional recipient allowlist for local email testing; remove for real users.
+RESEND_TEST_RECIPIENT=
+# Put a temporary Full access key in .local/resend-setup.env, never here.
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+
+# LinuxDO Connect OAuth2. Callback: APP_ORIGIN + /api/auth/linuxdo/callback
+# Leave both empty to hide LinuxDO login; use a separate app for localhost.
+LINUXDO_CLIENT_ID=
+LINUXDO_CLIENT_SECRET=

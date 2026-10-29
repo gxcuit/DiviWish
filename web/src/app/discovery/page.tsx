@@ -1,5 +1,5 @@
-import { Dashboard } from "@/features/dividends/components/dashboard";
+import { AuthGate } from "@/features/auth/auth-gate";
 
 export default function DiscoveryPage() {
-  return <Dashboard />;
+  return <AuthGate />;
 }

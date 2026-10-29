@@ -2,15 +2,12 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-// Local SQLite adapter with prepared statements and atomic synchronous batches.
-export class LocalDatabase {
+// Portable local D1 adapter. It executes real SQLite SQL and atomic synchronous
+// batches; the Worker receives the same prepared-statement API as Cloudflare D1.
+export class LocalD1 {
   constructor(filename, migrations) {
     if (filename !== ":memory:") mkdirSync(path.dirname(filename), { recursive: true });
     this.sqlite = new DatabaseSync(filename);
-    if (this.sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").get()) {
-      this.sqlite.close();
-      throw new Error("检测到账号数据库。请为 DIVIDEND_DATABASE 选择独立的单机 SQLite 文件；不会修改账号数据。");
-    }
     this.sqlite.exec("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;");
     this.sqlite.exec("CREATE TABLE IF NOT EXISTS local_migrations(name TEXT PRIMARY KEY)");
     for (const name of readdirSync(migrations).filter(file => file.endsWith(".sql")).sort()) {
