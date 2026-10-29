@@ -35,9 +35,9 @@ export function StockYieldGrid({ stock, onSave }: {
     <h3 className={styles.heading}><Grid3X3 size={17} />股息率网格</h3>
     <form onSubmit={save} onChange={() => { setMessage(""); setError(""); }}>
       <div className={styles.gridInputs}>
-        <label>起始股息率（%）<input type="number" min="0.01" max="100" step="any" required value={start} onChange={event => setStart(event.target.value)} /></label>
-        <label>结束股息率（%）<input type="number" min="0.01" max="100" step="any" required value={end} onChange={event => setEnd(event.target.value)} /></label>
-        <label>每格步长（百分点）<input type="number" min="0.01" max="100" step="any" required value={step} onChange={event => setStep(event.target.value)} /></label>
+        <label>起始股息率（%）<input type="number" min="0.1" max="100" step="0.1" required value={start} onChange={event => setStart(event.target.value)} /></label>
+        <label>结束股息率（%）<input type="number" min="0.1" max="100" step="0.1" required value={end} onChange={event => setEnd(event.target.value)} /></label>
+        <label>每格步长（百分点）<input type="number" min="0.1" max="100" step="0.1" required value={step} onChange={event => setStep(event.target.value)} /></label>
       </div>
       <div className={styles.saveRow}><small>例如步长 0.5：3% → 3.5% → 4%。</small><button className={styles.primary} disabled={saving}>{saving ? "保存中…" : "保存网格设置"}</button></div>
       {message && <p className={styles.success} role="status">{message}</p>}
