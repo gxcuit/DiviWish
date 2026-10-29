@@ -2,7 +2,24 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-2026-10-28 已将邮箱注册、密码登录、重置密码和账号数据隔离版本发布至现有 Worker `diviwish`。当前版本 ID：`52e2b5cd-1edc-406d-98fc-2726ee710195`，包含自定义域名 Turnstile 修复；首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`。
+当前生产版本为 `acd397e9-a225-4b9c-b0e2-9363ee434e59`，于 2026-10-30（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `ea5110922cf235e560a12d0c2a7ce7f2afedcc1b` 发布。三个股息率网格输入框（起始、结束、每格步长）的箭头步进均为 `0.1`。
+
+2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。本次更新前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-10-30 发布验证
+
+- 使用项目锁定的 Wrangler `4.152.0`，从独立多人版工作区构建；WSL 使用 Linux Node `24.21.0`，按 [WSL 流程](local-wsl.md) 显式 `--webpack` 导出静态页面。
+- lint、前后端类型检查、57 项业务/账号回归、静态构建、生产环境 dry-run、本地 HTTP/SQLite 和 LinuxDO 原生 workerd 检查全部通过；测试使用临时数据库及模拟邮件/授权服务。
+- 发布前确认生产变量、域名和账号 D1 ID 与仓库一致，核对现有密钥名称。通过 `wrangler deploy --env production --keep-vars` 发布，沿用已保存的运行密钥和额外变量；没有执行数据库迁移或更新密钥。
+- 主域名和 workers.dev 备用域名的发现页均返回 200，并引用本次构建的网格组件脚本；线上脚本与本地构建逐字节一致，均包含三个 `min="0.1"`、`step="0.1"` 输入框。组件脚本 SHA-256：`08ff0abc5e3b3ed5de3300582607e251ca3e57c9ef826f533e3119dcc358d80a`。
+- 两个域名的健康接口均报告 D1 正常；未登录访问股票接口返回 401，登录配置仍启用 LinuxDO。本次未登录真实账号执行网格编辑或真实邮件收发。
+- 本机验证明细保存于被忽略的 `.local/grid-step-production-verification.json`。
+
+### 发布登录凭据
+
+当前 WSL 已通过 Wrangler 官方设备授权登录，凭据保存在 `/home/gao/.config/.wrangler/config/default.toml`；先运行项目本地 `wrangler whoami` 检查身份及账号。该文件由 Wrangler 管理，不复制进仓库，也不输出内容。
+
+项目 `.local/production.secrets.json`、`.local/linuxdo-production.secrets.json` 和 `.dev.vars` 保存的是应用运行密钥；它们不包含本次使用的 Cloudflare 发布身份。新工作区不会自动复制被 Git 忽略的 `.local`，但同一 WSL 用户可复用全局 Wrangler 登录。需要重新授权时，可用项目本地 `wrangler login --device --browser=false`；必须在 Cloudflare 完成设备码授权，并等待 CLI 显示 `Successfully logged in.`。
 
 ## 环境与资源
 
@@ -45,7 +62,7 @@ npm run db:migrate:production
 npm run cf:deploy
 ```
 
-先在功能分支完成改动和检查，按分支流程合入 `develop`、`main` 后发布稳定版本。当前通过本地 Wrangler 发布，GitHub 推送本身不会触发部署。
+先在功能分支完成改动和检查，按多人版分支流程合入 `develop`、`multi-user` 后发布稳定版本；`main` 属于单机版。当前工作机的 WSL 构建优先遵循 [已验证流程](local-wsl.md)，不要先重试默认 Turbopack。当前通过本地 Wrangler 发布，GitHub 推送本身不会触发部署。
 
 ## 本次验证
 
