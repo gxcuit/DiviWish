@@ -449,3 +449,29 @@ test("historical backfill preserves concurrent nonfinancial settings and rejects
   assert.equal((await f.request(`/api/stocks/${id}/history`,'POST',{},cookie)).status,409);
   detail=await (await f.request(`/api/stocks/${id}`,'GET',undefined,cookie)).json();assert.deepEqual(detail.history,[]);assert.equal(detail.history_updated_at,undefined);
 });
+
+test("saved historical basis and upgraded caches remain isolated to the signed-in portfolio", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register(), bob = await f.register("basis-bob@example.test");
+  const added = await f.request("/api/stocks", "POST", { name: "口径测试", code: "600036", market: "A", sector: "银行", price: 10, annual_dividend: 0.5, rolling_dividend: 0.6 }, alice.cookie);
+  const { id } = await added.json();
+  const history = Array.from({ length: 80 }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10), close: 10, annual: 0.5, year: 2025, yield: i < 40 ? 0.02 : 0.05, rolling_yield: i < 40 ? 0.03 : 0.09 }));
+  const updatedAt = new Date(Date.now() + 8 * 3600_000).toISOString();
+  f.db.sqlite.prepare("UPDATE user_stocks SET document=json_set(document,'$.history',json(?),'$.history_updated_at',?) WHERE id=?")
+    .run(JSON.stringify(history.map(row => ({ date: row.date, close: row.close, annual: row.annual, year: row.year, yield: row.yield }))), updatedAt, id);
+  let calls = 0;
+  f.source.fetchHistory = async () => { calls++; return { history, history_version: 2, history_updated_at: updatedAt,
+    percentile_start: history[0].date, percentile_end: history.at(-1)!.date, history_source: "test", history_note: "test" }; };
+  await f.request(`/api/stocks/${id}`, "PATCH", { yield_basis: "rolling" }, alice.cookie);
+  assert.equal((await (await f.request(`/api/stocks/${id}`, "GET", undefined, alice.cookie)).json()).percentile, null);
+  assert.equal((await f.request(`/api/stocks/${id}/history`, "POST", {}, bob.cookie)).status, 404);
+  const detail = await (await f.request(`/api/stocks/${id}/history`, "POST", {}, alice.cookie)).json();
+  assert.equal(detail.percentile, 0.5); assert.equal(detail.quantile_60_yield, 0.09);
+  assert.ok(detail.percentile_history.every((row: { yield: number }, i: number) => row.yield === history[i].rolling_yield));
+  await f.request(`/api/stocks/${id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.08 }, alice.cookie);
+  const custom = await (await f.request(`/api/stocks/${id}/history`, "POST", {}, alice.cookie)).json();
+  assert.equal(calls, 1); assert.equal(custom.percentile, 1); assert.equal(custom.quantile_60_price, 10);
+  assert.ok(custom.percentile_history.every((row: { yield: number }) => row.yield === 0.08));
+  assert.equal((await f.request(`/api/stocks/${id}`, "GET", undefined, bob.cookie)).status, 404);
+  assert.ok(!("percentile_history" in (await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json()).stocks[0]));
+});

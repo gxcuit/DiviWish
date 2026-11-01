@@ -83,9 +83,18 @@ def derive(stock, fx_rate, a_prices=None):
     gap = selected_yield - target if selected_yield is not None and target is not None else None
     start_price = number(stock.get("year_start_price"))
     samples = stock.get("history") or []
-    values = sorted(value for row in samples if (value := number(row.get("yield"))) is not None and value >= 0)
+    history = []
+    for row in samples:
+        close = number(row.get("close"))
+        if stock.get("yield_basis") == "custom":
+            value = basis_dividend / close if basis_dividend is not None and close is not None and close > 0 else None
+        else:
+            value = number(row.get("rolling_yield" if stock.get("yield_basis") == "rolling" else "yield"))
+        if value is not None and math.isfinite(value) and value >= 0:
+            history.append({"date": row["date"], "close": row.get("close"), "yield": value})
+    values = sorted(row["yield"] for row in history)
     valid_history = len(values) >= MIN_HISTORY_SAMPLES
-    percentile = bisect.bisect_right(values, annual_yield + 1e-12) / len(values) if valid_history and annual_yield is not None else None
+    percentile = bisect.bisect_right(values, selected_yield + 1e-12) / len(values) if valid_history and selected_yield is not None else None
     result.update({
         "yield_basis": stock.get("yield_basis", "annual"),
         "custom_yield": stock.get("custom_yield"),
@@ -99,8 +108,9 @@ def derive(stock, fx_rate, a_prices=None):
         "year_change": price / start_price - 1 if price and start_price and start_price > 0 else None,
         "percentile": percentile,
         "percentile_count": len(values),
-        "percentile_start": stock.get("percentile_start"),
-        "percentile_end": stock.get("percentile_end"),
+        "percentile_history": history,
+        "percentile_start": history[0]["date"] if history else None,
+        "percentile_end": history[-1]["date"] if history else None,
         "ah_premium": None,
         "hk_net_yield": annual_yield * 0.9 if is_hk and annual_yield is not None else None,
         "connect_yield": annual_yield * connect_factor if is_hk and annual_yield is not None and connect_factor is not None else None,
@@ -110,9 +120,7 @@ def derive(stock, fx_rate, a_prices=None):
         result["ah_premium"] = a_price / denominator - 1
     for probability in (60, 90):
         quantile = values[math.ceil(probability / 100 * len(values)) - 1] if valid_history else None
-        quantile_price = annual / quantile if annual is not None and quantile and quantile > 0 else None
-        if is_hk:
-            quantile_price = quantile_price / fx_rate if quantile_price is not None and fx_rate else None
+        quantile_price = basis_dividend / quantile if basis_dividend is not None and quantile and quantile > 0 else None
         result[f"quantile_{probability}_yield"] = quantile
         result[f"quantile_{probability}_price"] = quantile_price
     return result

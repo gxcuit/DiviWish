@@ -8,6 +8,6 @@ export function render(stock: StockRecord, records: StockRecord[], meta: Record<
   delete result.connect_factor;
   delete result.a_price;
   if (detail) result.yield_grid = yieldGrid(stock, meta.fx_rate);
-  else { delete result.dividends; delete result.history; }
+  else { delete result.dividends; delete result.history; delete result.percentile_history; }
   return result;
 }

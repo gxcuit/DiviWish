@@ -160,6 +160,7 @@ class ApiTests(unittest.TestCase):
     @patch("backend.providers.fetch_fx", return_value=0.81)
     @patch("backend.providers.fetch_quotes", return_value=({1: {"price": 8, "change_pct": -0.01, "quote_date": "2026-10-21"}}, ["hk00001 缺失"]))
     def test_partial_refresh_only_updates_valid_quotes(self, _quotes, _fx):
+        before = self.client.get("/api/stocks/1").json
         previous_hk = self.client.get("/api/stocks/2").json
         response = self.client.post("/api/refresh", json={})
         self.assertEqual(response.status_code, 200)
@@ -167,7 +168,7 @@ class ApiTests(unittest.TestCase):
         changed = self.client.get("/api/stocks/1").json
         self.assertEqual(changed["price"], 8)
         self.assertEqual(changed["quote_date"], "2026-10-21")
-        self.assertEqual(changed["percentile_end"], "2026-10-20")
+        self.assertEqual(changed["percentile_end"], before["percentile_end"])
         unchanged = self.client.get("/api/stocks/2").json
         self.assertEqual(unchanged["price"], previous_hk["price"])
         self.assertEqual(unchanged["updated_at"], previous_hk["updated_at"])

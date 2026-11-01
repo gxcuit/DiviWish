@@ -11,16 +11,17 @@ class YieldBasisTests(TestCase):
     setUp = test_api.ApiTests.setUp
     tearDown = test_api.ApiTests.tearDown
 
-    def test_rolling_basis_changes_targets_and_grid_but_not_annual_history(self):
-        before = self.client.get("/api/stocks/1").json
+    def test_rolling_basis_does_not_substitute_legacy_annual_history(self):
         self.assertEqual(self.client.patch("/api/stocks/1", json={"yield_basis": "rolling"}).status_code, 200)
         stock = self.client.get("/api/stocks/1").json
         self.assertEqual(stock["selected_yield"], 0.06)
         self.assertEqual(stock["dividend_yield"], 0.05)
         self.assertAlmostEqual(stock["target_price"], 12)
         self.assertAlmostEqual(stock["yield_gap"], 0.01)
-        self.assertEqual(stock["percentile"], before["percentile"])
-        self.assertEqual(stock["quantile_90_price"], before["quantile_90_price"])
+        self.assertIsNone(stock["percentile"])
+        self.assertEqual(stock["percentile_count"], 0)
+        self.assertEqual(stock["percentile_history"], [])
+        self.assertIsNone(stock["quantile_90_price"])
         self.assertAlmostEqual(stock["yield_grid"][0]["price"], 0.6 / 0.03)
 
     def test_custom_percent_is_stored_independently_per_stock_and_survives_restart(self):
@@ -29,7 +30,9 @@ class YieldBasisTests(TestCase):
         client = create_app(self.config).test_client()
         stock = client.get("/api/stocks/1").json
         self.assertEqual(stock["selected_yield"], 0.08)
-        self.assertEqual(stock["percentile"], 0.75)
+        self.assertEqual(stock["percentile"], 1)
+        self.assertAlmostEqual(stock["quantile_60_yield"], 0.08)
+        self.assertAlmostEqual(stock["quantile_60_price"], 10)
         self.assertAlmostEqual(stock["basis_dividend"], 0.8)
         self.assertAlmostEqual(stock["target_price"], 16)
         self.assertEqual(client.get("/api/stocks/2").json["yield_basis"], "annual")
@@ -93,3 +96,26 @@ class YieldBasisTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["yield_basis"], "annual")
         self.assertIsNone(response.json["custom_yield"])
+
+    def test_selected_history_and_quantile_prices_match_the_saved_basis(self):
+        stock = test_api.sample_seed()["stocks"][0]
+        stock["history"] = [{**row, "close": [5, 10, 20, 40][i % 4],
+                             "rolling_yield": [0.03, 0.06, 0.09, 0.12][i % 4]}
+                            for i, row in enumerate(stock["history"])]
+        rolling = derive({**stock, "yield_basis": "rolling"}, 0.8)
+        self.assertAlmostEqual(rolling["percentile"], 0.5)
+        self.assertAlmostEqual(rolling["quantile_60_yield"], 0.09)
+        self.assertAlmostEqual(rolling["quantile_60_price"], 0.6 / 0.09)
+        self.assertEqual(rolling["history"], stock["history"])
+        custom = {**stock, "yield_basis": "custom", "custom_yield": 0.08}
+        result = derive(custom, None)
+        self.assertAlmostEqual(result["percentile"], 0.75)
+        self.assertEqual([row["yield"] for row in result["percentile_history"][:4]], [0.16, 0.08, 0.04, 0.02])
+        self.assertAlmostEqual(result["quantile_60_price"], 10)
+        refreshed = derive({**custom, "price": 20}, None)
+        self.assertAlmostEqual(refreshed["percentile"], 0.5)
+        self.assertAlmostEqual(refreshed["quantile_60_yield"], 0.16)
+        self.assertIsNone(derive({**custom, "price": None}, None)["percentile"])
+        zero = derive({**custom, "custom_yield": 0}, None)
+        self.assertEqual(zero["percentile"], 1)
+        self.assertIsNone(zero["quantile_60_price"])

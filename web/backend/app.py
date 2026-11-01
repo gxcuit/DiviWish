@@ -143,6 +143,7 @@ def create_app(config=None):
         if not include_detail:
             result.pop("dividends", None)
             result.pop("history", None)
+            result.pop("percentile_history", None)
         return result
 
     @app.before_request
@@ -261,7 +262,7 @@ def create_app(config=None):
         results = []
         for stock in records:
             result = derive(stock, meta.get("fx_rate"), a_prices)
-            for key in ("history", "dividends", "connect_factor", "a_price"):
+            for key in ("history", "percentile_history", "dividends", "connect_factor", "a_price"):
                 result.pop(key, None)
             results.append(result)
         return jsonify(stocks=results, sectors=[sector["name"] for sector in sector_records()],
