@@ -501,3 +501,25 @@ test("BOLL reuses only public band data across requests and force refresh honors
   const forced = await (await f.request(`/api/stocks/${a}/boll?refresh=1`,'GET',undefined,alice.cookie)).json();
   assert.equal(forced.price,40); assert.equal(forced.cached,false); assert.equal(calls,6);
 });
+
+
+test("account refresh saves yearly metrics with owner isolation and preserves concurrent baseline edits", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register(), bob = await f.register("bob@example.test");
+  const stock = await (await f.request("/api/stocks", "POST", { code: "600036", market: "A", name: "招商银行", sector: "银行" }, alice.cookie)).json();
+  f.source.fetchQuotes = async () => ({ quotes: new Map([[stock.id, { price: 43.55, quote_date: "2026-10-30", year_start_price: 40.084, year_start_date: "2025-12-31", year_start_year: 2026, year_start_adjustment: "qfq" }]]), errors: [] });
+  f.source.fetchDividends = async () => ({ ...DIVIDEND, annual_dividend: 2.016, annual_eps: 5.7, annual_eps_year: 2025, annual_eps_currency: "CNY" });
+  assert.equal((await f.request(`/api/stocks/${stock.id}/refresh`, "POST", {}, alice.cookie)).status, 200);
+  const detail = await (await f.request(`/api/stocks/${stock.id}`, "GET", undefined, alice.cookie)).json();
+  assert.equal(detail.year_change, 43.55 / 40.084 - 1); assert.equal(detail.payout_ratio, 2.016 / 5.7);
+  assert.equal((await f.request(`/api/stocks/${stock.id}`, "GET", undefined, bob.cookie)).status, 404);
+  f.source.fetchQuotes = async () => {
+    await f.request(`/api/stocks/${stock.id}`, "PATCH", { year_start_price: 50 }, alice.cookie);
+    return { quotes: new Map([[stock.id, { price: 99, quote_date: "2026-10-30", year_start_price: 40 }]]), errors: [] };
+  };
+  await f.request(`/api/stocks/${stock.id}/refresh`, "POST", {}, alice.cookie);
+  const edited = await (await f.request(`/api/stocks/${stock.id}`, "GET", undefined, alice.cookie)).json();
+  assert.equal(edited.year_start_price, 50); assert.equal(edited.price, 43.55);
+  await f.request(`/api/stocks/${stock.id}`, "PATCH", { annual_dividend: 1 }, alice.cookie);
+  assert.equal((await (await f.request(`/api/stocks/${stock.id}`, "GET", undefined, alice.cookie)).json()).payout_ratio, null);
+});
