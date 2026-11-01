@@ -2,9 +2,19 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `acd397e9-a225-4b9c-b0e2-9363ee434e59`，于 2026-10-30（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `ea5110922cf235e560a12d0c2a7ce7f2afedcc1b` 发布。三个股息率网格输入框（起始、结束、每格步长）的箭头步进均为 `0.1`。
+当前生产版本为 `f6fd7365-f2cd-4260-8741-958523e91283`，于 2026-11-01（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `a6fe13defad211c866f33a8e8a4b501549092eca` 发布。历史分位、曲线及 60 / 90 分位股息率和对应价格统一采用用户已保存的年度、滚动年度或自定义口径；两项分位价格标签同时显示所选口径与价格币种。
 
-2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。本次更新前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-11-01 发布验证
+
+- 两次修复已分别推送单机版 `main` / `codex/standalone`（`27eee42`、`46fcffa`）和多人版 `develop` / `multi-user`（`19e1925`、`c85ee2f`）；多人版通过合并提交 `a6fe13d` 发布。
+- 单机版 34 项、多人版 60 项 Node 业务 / 账号测试及共享 Flask 55 项测试通过；两版 lint、类型及 webpack 静态构建通过。本地 HTTP / SQLite、LinuxDO 原生 workerd 和生产配置 dry-run 已通过。
+- 发布前确认生产账号、变量、D1 标识和密钥名称。使用锁定的 Wrangler `4.152.0`，以 `deploy --env production --keep-vars` 发布；沿用线上变量、密钥和既有账号 D1，未执行数据库迁移。
+- 新版本 `f6fd7365-f2cd-4260-8741-958523e91283` 已接收 100% 生产流量，版本标签为 `a6fe13d`；上一版为 `acd397e9-a225-4b9c-b0e2-9363ee434e59`。
+- 主域名与 workers.dev 备用域名的发现、登录、注册和重置密码页均返回 200，健康接口报告 D1 正常，LinuxDO、邮件和 Turnstile 登录配置仍启用。未登录访问股票和板块返回 401，跨站写入返回 403。
+- 两个域名引用的新看板脚本与发布产物逐字节一致，包含所选历史序列和随口径变化的 60 / 90 分位标签。脚本 SHA-256：`b423639c45b5ac64b4cb7ae062c65cb8a55b9e05689b65b87d2ccf7aa1e6e55d`。
+- 本次线上检查未登录真实账号切换口径，也未发送真实邮件；口径数值与账号隔离由临时数据库回归验证。验证明细保存在发布工作区被忽略的 `.local/percentile-production-verification.json`。
 
 ## 2026-10-30 发布验证
 
