@@ -2,11 +2,22 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `f6fd7365-f2cd-4260-8741-958523e91283`，于 2026-11-01（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `a6fe13defad211c866f33a8e8a4b501549092eca` 发布。历史分位、曲线及 60 / 90 分位股息率和对应价格统一采用用户已保存的年度、滚动年度或自定义口径；两项分位价格标签同时显示所选口径与价格币种。
+当前生产版本为 `5f4f05cb-d5aa-42c3-9b64-ff06ecfe2e89`，于 2026-11-01（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `fd498d8aad1ca57ca1d1611b5a3270ef403fbcae` 发布。股票列表显示日、周、月三个两字 BOLL 位置标签，以各周期通道总宽度的 5% 判断附近；颜色区分位置，浅色虚线表示接近，深色实线表示触及或越过上下轨。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
 
-## 2026-11-01 发布验证
+## 2026-11-01 BOLL 标签发布验证
+
+- 单机版 `main` / `codex/standalone` 已推送 `e2e1e06`，多人版 `develop` / `multi-user` 已推送并发布 `fd498d8`。
+- 单机版 40 项、多人版 66 项 Node 测试及共享 Flask 56 项测试通过；两版 lint、类型、webpack 静态构建、本地 HTTP 运行检查通过，多人版 LinuxDO 原生 workerd 和生产配置 dry-run 通过。
+- 两版均完成 320 / 604 / 1280 像素 Chromium 检查：两字标签、颜色、5% 邻近虚线、部分周期数据不足、可见行加载、最多两只并发请求、列表和详情共用缓存及刷新联动均通过；没有横向溢出或页面脚本错误。浏览器检查使用模拟行情与临时本机服务。
+- 发布前核对生产身份、变量、D1 标识及必需密钥名称，以 Wrangler `4.152.0` 的 `deploy --env production --keep-vars` 发布；沿用原变量、密钥和账号 D1，没有执行数据库迁移。
+- 新版本 `5f4f05cb-d5aa-42c3-9b64-ff06ecfe2e89` 接收 100% 生产流量，标签为 `fd498d8`；上一版为 `f6fd7365-f2cd-4260-8741-958523e91283`。
+- 主域名及 workers.dev 备用域名的发现、登录、注册、重置密码页均返回 200，D1 健康检查正常，LinuxDO、邮件和 Turnstile 配置仍启用。未登录读取股票、板块及 BOLL 返回 401，跨站写入返回 403。
+- 两个域名实际引用的新看板脚本与样式均和发布产物逐字节一致。JS SHA-256：`ba5ef13d9bf80c4e475481d9d0833466777715be31a3eaad82b249c3d63c83c4`；CSS SHA-256：`9ef712eb624fe6af0bc50d792e3da74429549390d33431a67a2fcf584e3d6429`。
+- 本次没有登录真实账号操作 BOLL、发送真实邮件或修改生产数据；阈值及交互由本地回归和浏览器检查验证。线上验证记录位于发布工作区被忽略的 `.local/boll-production-verification.json`。
+
+## 2026-11-01 历史分位发布验证
 
 - 两次修复已分别推送单机版 `main` / `codex/standalone`（`27eee42`、`46fcffa`）和多人版 `develop` / `multi-user`（`19e1925`、`c85ee2f`）；多人版通过合并提交 `a6fe13d` 发布。
 - 单机版 34 项、多人版 60 项 Node 业务 / 账号测试及共享 Flask 55 项测试通过；两版 lint、类型及 webpack 静态构建通过。本地 HTTP / SQLite、LinuxDO 原生 workerd 和生产配置 dry-run 已通过。
