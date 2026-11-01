@@ -29,16 +29,16 @@
 .sectorBar > .sectors { flex: 1; min-width: 0; }
 .sectorManageButton { display: flex; align-items: center; gap: 5px; flex-shrink: 0; margin: 20px 0 8px; padding: 6px 9px; height: 32px; font-size: 12px; color: #737b88; background: white; border-radius: 8px; }
 .stockList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px #00000008; }
-.stockRow { display: flex; align-items: center; padding-right: 16px; min-width: 0; border-bottom: 1px solid #f0f1f3; height: 66px; }
+.stockRow { display: flex; align-items: center; padding-right: 16px; min-width: 0; border-bottom: 1px solid #f0f1f3; min-height: 90px; }
 .stockRow:nth-child(odd) { border-right: 1px solid #f0f1f3; }
-.stockContent { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 16px; flex: 1; min-width: 0; text-align: left; height: 100%; }
+.stockContent { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 16px; flex: 1; min-width: 0; text-align: left; align-self: stretch; min-height: 90px; }
 .stockContent:hover { background: #fafafa; }
 .stockIdentity { min-width: 0; flex: 1; }
-.stockName { display: flex; align-items: center; font-size: 14px; font-weight: 600; gap: 8px; white-space: nowrap; }
+.stockName { display: flex; align-items: center; font-size: 14px; font-weight: 600; gap: 4px 6px; flex-wrap: wrap; }
 .confirmed { background: #dbeafe; color: #1d4ed8; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 400; line-height: 15px; }
 .basisBadge { background: #f3f4f6; color: #737b88; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 400; line-height: 15px; }
 .marketBadge { font-size: 9px; background: #fff2dc; color: #9b6a16; padding: 0 4px; border-radius: 3px; }
-.stockSubtitle { display: flex; gap: 12px; font-size: 12px; color: #6b7280; margin-top: 2px; white-space: nowrap; }
+.stockSubtitle { display: flex; flex-wrap: wrap; gap: 1px 12px; font-size: 12px; color: #6b7280; margin-top: 2px; white-space: nowrap; }
 .up { color: #ff3344; }
 .down { color: #00b674; }
 .stockQuote { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }

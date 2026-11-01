@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CalendarDays, ChartNoAxesCombined, Check, ChevronLeft, ChevronRight, Circle, CirclePlus, Database, Menu, RefreshCw, Search, Settings2, Sprout, Star, UserRound, X } from "lucide-react";
 import type { GridSettings, Stock, StockDetail, StockPreview, StocksResponse, YieldBasisSettings } from "../types";
 import styles from "./dashboard.module.css";
@@ -11,6 +11,8 @@ import { StockYieldGrid } from "./stock-yield-grid";
 import { YieldBasisPicker, yieldLabels } from "./yield-basis-picker";
 import { SectorManager } from "./sector-manager";
 import { StockBoll } from "./stock-boll";
+import { BollProvider } from "./boll-provider";
+import { BollLegend, StockBollTags } from "./stock-boll-tags";
 
 type View = "discovery" | "watchlist" | "income" | "calendar" | "settings";
 const navigation = [
@@ -38,10 +40,12 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
 }
 
 function StockRow({ stock, onOpen, onWatch }: { stock: Stock; onOpen: (stock: Stock) => void; onWatch: (stock: Stock) => void }) {
+  const bollDescriptionId = useId();
   return <div className={styles.stockRow}>
-    <button className={styles.stockContent} onClick={() => onOpen(stock)} aria-label={`查看${stock.name}详情`}>
+    <button className={styles.stockContent} onClick={() => onOpen(stock)} aria-label={`查看${stock.name}详情`} aria-describedby={bollDescriptionId}>
       <span className={styles.stockIdentity}><span className={styles.stockName}>{stock.name}{stock.yield_basis && stock.yield_basis !== "annual" && <span className={styles.basisBadge}>{stock.yield_basis === "rolling" ? "滚动" : "自定义"}</span>}{stock.confirmed && <span className={styles.confirmed}>确认</span>}{stock.market === "HK" && <span className={styles.marketBadge}>港</span>}</span>
         <span className={styles.stockSubtitle}><span>{stock.code}</span><span>年度红利 ¥{number(stock.annual_dividend, 3)}</span><span className={stock.change_pct !== null && stock.change_pct > 0 ? styles.up : styles.down}>{percent(stock.change_pct, true)}</span></span>
+        <StockBollTags key={`${stock.id}:${stock.market}:${stock.code}`} stock={stock} id={bollDescriptionId} />
       </span>
       <span className={styles.stockQuote}><strong>{currency(stock)}{number(stock.price)}</strong><span title={yieldLabels[stock.yield_basis || "annual"]} className={`${styles.yieldBadge} ${styles[stock.status]}`}>{percent(stock.selected_yield)}</span></span>
     </button>
@@ -305,7 +309,7 @@ export function Dashboard() {
   const matchingCount = filtered.length;
   const marketControls = <div className={styles.marketControls} role="group" aria-label="市场筛选">{[["all", "全部市场"], ["A", "A 股"], ["HK", "港股"]].map(([key, label]) => <button key={key} aria-pressed={market === key} className={market === key ? styles.marketActive : ""} onClick={() => setMarket(key)}>{label}</button>)}</div>;
 
-  return <main className={styles.shell}>
+  return <BollProvider><main className={styles.shell}>
     <div className={styles.brand}><span className={styles.brandIcon}><Sprout size={22} aria-hidden="true" /></span><strong>DiviWish <span>息望</span></strong><small>每一笔股息都是未来的希望</small></div>
     <header className={styles.header}><div className={styles.headerActions}>
       <button aria-label="刷新行情与股息" title="刷新行情与股息" onClick={() => refresh()} disabled={busy}><RefreshCw size={18} className={busy ? styles.spinning : ""} /></button>
@@ -321,7 +325,7 @@ export function Dashboard() {
 
       {(view === "discovery" || view === "watchlist") && <>
         <div className={styles.sectorBar}><div className={styles.sectors} role="group" aria-label="行业分类">{[...sectors, "全部"].map(item => <button key={item} aria-pressed={sector === item} className={sector === item ? styles.activeSector : ""} onClick={() => setSector(item)}>{item}</button>)}</div><button className={styles.sectorManageButton} aria-label="板块管理" onClick={() => setManagingSectors(true)}><Settings2 size={15} />管理</button></div>
-        {!data && !error ? <div className={styles.empty}><RefreshCw className={styles.spinning} size={22} /><p>正在读取股息数据…</p></div> : matchingCount > 0 ? <section className={styles.stockList} aria-label="股票列表">{filtered.map(stock => <StockRow key={stock.id} stock={stock} onOpen={openStock} onWatch={watch} />)}</section> : <div className={styles.empty}><Star size={30} /><h2>{view === "watchlist" ? "这里还没有自选股票" : "没有符合条件的股票"}</h2><p>{view === "watchlist" ? "在发现页点击星标，把关注的股息收入留在这里。" : "换一个板块或清除筛选试试。"}</p><button className={styles.primaryButton} onClick={() => { setSector("全部"); setSearch(""); setMarket("all"); if (view === "watchlist") navigate("discovery"); }}>查看全部股票</button></div>}
+        {!data && !error ? <div className={styles.empty}><RefreshCw className={styles.spinning} size={22} /><p>正在读取股息数据…</p></div> : matchingCount > 0 ? <><section className={styles.stockList} aria-label="股票列表">{filtered.map(stock => <StockRow key={stock.id} stock={stock} onOpen={openStock} onWatch={watch} />)}</section><BollLegend /></> : <div className={styles.empty}><Star size={30} /><h2>{view === "watchlist" ? "这里还没有自选股票" : "没有符合条件的股票"}</h2><p>{view === "watchlist" ? "在发现页点击星标，把关注的股息收入留在这里。" : "换一个板块或清除筛选试试。"}</p><button className={styles.primaryButton} onClick={() => { setSector("全部"); setSearch(""); setMarket("all"); if (view === "watchlist") navigate("discovery"); }}>查看全部股票</button></div>}
       </>}
 
 
@@ -341,5 +345,5 @@ export function Dashboard() {
     {managingSectors && <Modal title="板块管理" onClose={() => setManagingSectors(false)}><SectorManager onChange={async () => { const next = await load(); setSector(current => current === "全部" || next.sectors.includes(current) ? current : "全部"); }} /></Modal>}
     {form && <StockForm stock={form.stock} sectors={sectors} onClose={() => setForm(null)} onSave={async values => { await api(form.stock ? `/stocks/${form.stock.id}` : "/stocks", { method: form.stock ? "PATCH" : "POST", body: JSON.stringify(values) }); await load(); setDetail(null); setNotice("股票已保存"); }} />}
     {deleting && <Modal title="删除股票" onClose={() => setDeleting(null)}><div className={styles.detailBody}><p>确定从本地数据库删除「{deleting.name}」？删除后无法恢复。</p><div className={styles.detailButtons}><button onClick={() => setDeleting(null)}>取消</button><button className={styles.dangerButton} onClick={() => perform(async () => { await api(`/stocks/${deleting.id}`, { method: "DELETE" }); await load(); setDeleting(null); setNotice("股票已删除"); })}>确认删除</button></div></div></Modal>}
-  </main>;
+  </main></BollProvider>;
 }

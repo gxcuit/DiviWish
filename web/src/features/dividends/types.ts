@@ -96,7 +96,7 @@ export interface StocksResponse {
   };
 }
 
-export type BollPosition = 'below_lower' | 'at_lower' | 'lower_half' | 'at_middle' | 'upper_half' | 'at_upper' | 'above_upper' | 'flat' | 'unknown';
+export type BollPosition = 'below_lower' | 'at_lower' | 'near_lower' | 'lower_half' | 'at_middle' | 'upper_half' | 'near_upper' | 'at_upper' | 'above_upper' | 'flat' | 'unknown';
 
 interface BollFrameBase {
   period: 'day' | 'week' | 'month';

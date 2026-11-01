@@ -39,6 +39,18 @@ class BollCalculationTests(TestCase):
             self.assertEqual(price_position(band, price), {"position": label, "percent_b": percent})
         self.assertEqual(price_position(band, None)["position"], "unknown")
 
+    def test_nearby_ranges_are_five_percent_of_full_width_and_touches_stay_distinct(self):
+        band = {"lower": 45, "middle": 50, "upper": 55}
+        for price, expected in [(44.99, "below_lower"), (45, "at_lower"), (45.5, "near_lower"),
+                                (45.50001, "lower_half"), (49.49999, "lower_half"), (49.5, "at_middle"),
+                                (50.5, "at_middle"), (50.50001, "upper_half"), (54.49999, "upper_half"),
+                                (54.5, "near_upper"), (55, "at_upper"), (55.01, "above_upper")]:
+            with self.subTest(price=price):
+                self.assertEqual(price_position(band, price)["position"], expected)
+                self.assertEqual(price_position({key: value * 10 for key, value in band.items()}, price * 10)["position"], expected)
+        for price in (None, float("nan"), float("inf")):
+            self.assertEqual(price_position(band, price)["position"], "unknown")
+
     def test_flat_series_and_invalid_prices_do_not_produce_nan(self):
         rows = [{**bar, "close": 10} for bar in candles(20)]
         band = calculate_bands(rows)

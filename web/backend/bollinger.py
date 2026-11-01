@@ -35,7 +35,7 @@ def calculate_bands(bars):
 
 
 def price_position(band, price):
-    if price is None:
+    if price is None or number(price) is None:
         return {"position": "unknown", "percent_b": None}
     lower, middle, upper = (band[key] for key in ("lower", "middle", "upper"))
     # A flat series has no width; %B is undefined, not zero or infinity.
@@ -50,7 +50,11 @@ def price_position(band, price):
         position = "at_lower"
     elif math.isclose(price, upper, rel_tol=1e-12):
         position = "at_upper"
-    elif math.isclose(price, middle, rel_tol=1e-12):
+    elif price - lower <= (upper - lower) * 0.05 + 1e-12:
+        position = "near_lower"
+    elif upper - price <= (upper - lower) * 0.05 + 1e-12:
+        position = "near_upper"
+    elif abs(price - middle) <= (upper - lower) * 0.05 + 1e-12:
         position = "at_middle"
     else:
         position = "lower_half" if price < middle else "upper_half"

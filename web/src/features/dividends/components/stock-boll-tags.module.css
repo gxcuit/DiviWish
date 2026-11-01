@@ -1,0 +1,14 @@
+.tags { display: flex; flex-wrap: nowrap; gap: 4px; margin-top: 5px; width: fit-content; }
+.tag { display: inline-flex; justify-content: center; align-items: center; box-sizing: border-box; min-width: 30px; padding: 1px 4px; border: 1px solid transparent; border-radius: 4px; font-size: 10px; line-height: 15px; font-weight: 500; white-space: nowrap; }
+.upper { color: #b42318; background: #fee7e4; border-color: #f3aca5; font-weight: 700; }
+.nearUpper { color: #ad493e; background: #fff6f4; border-color: #d9968d; border-style: dashed; }
+.high { color: #945300; background: #fff4df; border-color: #f2dfb6; }
+.middle { color: #245bb0; background: #eaf1ff; border-color: #c8d8f7; }
+.low { color: #0c727d; background: #e8f6f7; border-color: #c0e2e5; }
+.nearLower { color: #307b5b; background: #f2fbf5; border-color: #8ec2a7; border-style: dashed; }
+.lower { color: #08633f; background: #ddf4e6; border-color: #9acdb0; font-weight: 700; }
+.neutral { color: #6b7280; background: #f3f4f6; border-color: #e5e7eb; }
+.stale { opacity: .65; }
+.legend { margin: 10px 3px 0; font-size: 11px; color: #727b89; line-height: 1.8; }
+.legend summary { cursor: pointer; width: fit-content; }
+.legend p { margin: 5px 0; }
