@@ -475,3 +475,29 @@ test("saved historical basis and upgraded caches remain isolated to the signed-i
   assert.equal((await f.request(`/api/stocks/${id}`, "GET", undefined, bob.cookie)).status, 404);
   assert.ok(!("percentile_history" in (await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json()).stocks[0]));
 });
+
+test("BOLL reuses only public band data across requests and force refresh honors each account's own quote", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register(), bob = await f.register('boll-bob@example.test');
+  const create = async (cookie: string, price: number, quoteDate: string) => {
+    const response = await f.request('/api/stocks', 'POST', {code:'600036',name:'招商银行',market:'A',sector:'银行',price},cookie);
+    assert.equal(response.status,201,await response.clone().text());
+    const {id} = await response.json();
+    f.db.sqlite.prepare("UPDATE user_stocks SET document=json_set(document,'$.quote_date',?) WHERE id=?").run(quoteDate,id);
+    return id;
+  };
+  const a = await create(alice.cookie,40,'2026-10-30'), b = await create(bob.cookie,60,'2026-10-31');
+  let calls = 0;
+  f.source.fetchKline = async () => {
+    calls++;
+    return { bars: Array.from({length:30},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,close:30+i})),adjustment:'qfq',quote:{price:50,quote_date:'2026-10-29'} };
+  };
+  assert.equal((await f.request(`/api/stocks/${a}/boll`)).status,401);
+  const first = await (await f.request(`/api/stocks/${a}/boll`,'GET',undefined,alice.cookie)).json();
+  assert.equal(first.price,40); assert.equal(first.cached,false); assert.equal(calls,3);
+  const second = await (await f.request(`/api/stocks/${b}/boll`,'GET',undefined,bob.cookie)).json();
+  assert.equal(second.price,60); assert.equal(second.cached,true); assert.equal(calls,3);
+  assert.equal((await f.request(`/api/stocks/${a}/boll`,'GET',undefined,bob.cookie)).status,404);
+  const forced = await (await f.request(`/api/stocks/${a}/boll?refresh=1`,'GET',undefined,alice.cookie)).json();
+  assert.equal(forced.price,40); assert.equal(forced.cached,false); assert.equal(calls,6);
+});

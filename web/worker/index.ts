@@ -10,6 +10,7 @@ import { sectorName, timestamp, validate } from "./validation.ts";
 import type { Env, Providers, Suggestion } from "./types.ts";
 
 export function createHandler(source: Providers = providers, authOptions: Parameters<typeof createAuth>[0] = {}) {
+  const bollinger = new BollingerService();
   const auth = createAuth(authOptions);
   const linuxdo = createLinuxdoAuth(authOptions);
   return async function handle(request: Request, env: Env): Promise<Response> {
@@ -129,7 +130,7 @@ export function createHandler(source: Providers = providers, authOptions: Parame
         }
         if (stockMatch[2] === "/boll") {
           if (method !== "GET") throw new HttpError(405, "不支持的请求方法");
-          return json(await new BollingerService().get(stock, source));
+          return json(await bollinger.get(stock, source, url.searchParams.get("refresh") === "1"));
         }
         if (method === "POST") throw new HttpError(405, "不支持的请求方法");
         if (method === "GET") return json(render(stock, await store.stocks(), await store.meta(), true));

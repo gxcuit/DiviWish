@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseKline, parseQuotes, parseSearch, quoteDate, symbolFor } from "../providers.ts";
+import { parseKline, parseQuotes, parseSearch, providers, quoteDate, symbolFor } from "../providers.ts";
 import { sampleStocks } from "./helpers.ts";
 
 test("Tencent search filters unsupported securities, decodes JSON escapes and keeps leading code zeros", () => {
@@ -32,4 +32,35 @@ test("K-lines preserve native timeframe and adjustment labels, sort dates, rejec
   for (const rows of [[["2026-10-23", "40", "NaN"]], [["2026-10-23", "40", "42"], ["2026-10-23", "40", "43"]], [["2026-02-30", "40", "42"]]]) {
     assert.throws(() => parseKline({ data: { sh600001: { day: rows } } }, a, "day"));
   }
+});
+
+test("Tencent K-lines fall back once after HTTP 501 without changing security, timeframe or adjustment", async t => {
+  const [a, hk] = sampleStocks();
+  for (const [stock, period, symbol, endpoint] of [[a, "day", "sh600001", "fqkline"], [hk, "month", "hk00001", "hkfqkline"]] as const) {
+    const urls: URL[] = [];
+    let cancelled = false;
+    const mock = t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+      urls.push(new URL(String(input)));
+      return urls.length === 1 ? new Response(new ReadableStream({ cancel() { cancelled = true; } }), { status: 501 }) : Response.json({ code: 0, data: {
+        [symbol]: { ["qfq" + period]: [["2026-10-30", "40", "42"]] },
+      } });
+    });
+    const result = await providers.fetchKline(stock, period);
+    assert.equal(result.bars[0].close, 42); assert.equal(result.adjustment, "qfq");
+    assert.equal(cancelled, true);
+    assert.deepEqual(urls.map(url => url.hostname), ["ifzq.gtimg.cn", "web.ifzq.gtimg.cn"]);
+    assert.ok(urls.every(url => url.pathname === `/appstock/app/${endpoint}/get` && url.searchParams.get("param") === `${symbol},${period},,,30,qfq`));
+    mock.mock.restore();
+  }
+});
+
+test("K-line fallback is bounded, reports real errors and does not retry rate limits", async t => {
+  const [stock] = sampleStocks(); let calls = 0;
+  const mock = t.mock.method(globalThis, "fetch", async () => { calls++; return new Response("unavailable", { status: 501 }); });
+  await assert.rejects(providers.fetchKline(stock, "week"), /腾讯 K 线暂不可用.*HTTP 501/);
+  assert.equal(calls, 2); mock.mock.restore();
+  calls = 0;
+  t.mock.method(globalThis, "fetch", async () => { calls++; return new Response("rate limited", { status: 429 }); });
+  await assert.rejects(providers.fetchKline(stock, "week"), /HTTP 429/);
+  assert.equal(calls, 1);
 });
