@@ -2,9 +2,20 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `5f4f05cb-d5aa-42c3-9b64-ff06ecfe2e89`，于 2026-11-01（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `fd498d8aad1ca57ca1d1611b5a3270ef403fbcae` 发布。股票列表显示日、周、月三个两字 BOLL 位置标签，以各周期通道总宽度的 5% 判断附近；颜色区分位置，浅色虚线表示接近，深色实线表示触及或越过上下轨。
+当前生产版本为 `45811e6a-4216-439c-a59f-579507545856`，于 2026-11-01（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `5e571f8fec8d9d8762f604c54ba5b7c9d0885c1a` 发布。本次修复腾讯旧 K 线入口在 Cloudflare 取数时返回 HTTP 501 导致 BOLL 标签全部为空的问题；保留三个两字位置标签与 5% 附近口径，补充备用入口、错误诊断、一次延迟重试及多人版公共行情缓存。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-11-01 BOLL 真实行情修复验证
+
+- 已在 Cloudflare 远程临时运行时复现旧入口 `web.ifzq.gtimg.cn` 的 HTTP 501；同一 K 线请求在本机 Node 可返回 200。先前模拟行情和页面/权限检查未覆盖这条真实取数链路。
+- 改为优先使用实测可用的腾讯 `ifzq.gtimg.cn`，失败后最多尝试一次同源 `web.ifzq.gtimg.cn`，证券、日周月、复权和日期参数不变。HTTP 错误响应释放连接，429 不切换入口重试；失败原因保留真实状态码，可见页面五秒后自动重试一次。
+- 多人版修正每次 BOLL 请求重新创建缓存的问题，复用 Worker 实例内的公开 K 线缓存并支持 `refresh=1`。个人保存报价仍在每个账号请求内应用，新增回归验证两个账号相同证券的不同报价不会串用，且私有接口继续按账号校验。
+- 使用生产相同的 `2026-10-27` 兼容日期在 Cloudflare 原生远程预览真实访问腾讯，招商银行、紫金矿业、中国平安、华能国际、云铝股份和港股中国移动共 18 个日/周/月 BOLL 周期全部取得有效 20 根样本，K 线截至 2026-10-30。探针未绑定数据库或应用密钥，检查后已停止。
+- 单机版 42 项、多人版 69 项 Node 回归及共享 Flask 58 项回归通过；两版 lint、类型、webpack 构建、HTTP 运行检查及多人版 LinuxDO 原生检查通过。两版 320/604/1280 像素 Chromium 检查包含首次 HTTP 501 后五秒自动恢复，并验证详情刷新联动。
+- 修复分别推送单机版 `main` / `codex/standalone` 的 `40f28e1`、多人版 `develop` / `multi-user` 的 `5e571f8`。生产 dry-run 通过，使用 `--env production --keep-vars` 发布，沿用既有变量、密钥和 D1，没有执行迁移或修改个人数据。
+- 新生产版本 `45811e6a-4216-439c-a59f-579507545856` 接收 100% 流量；上一版为 `5f4f05cb-d5aa-42c3-9b64-ff06ecfe2e89`。两个域名页面和 D1 健康正常，私有股票/板块/BOLL 返回 401，跨站写入返回 403，登录配置保持启用；新脚本与样式均和发布产物逐字节一致。
+- JS SHA-256：`8ae9e8a289e603fab16fb2af55969c584aee97389fbd6b9d2b9dfaa1fbfb15ab`。真实源数据与上线检查记录保存于被忽略的 `.local/boll-fallback-live-source-verification.json`、`.local/boll-production-verification.json`。本次没有登录真实生产账号手动操作标签；已使用真实 Cloudflare 取数和本地完整 API 验证链路。
 
 ## 2026-11-01 BOLL 标签发布验证
 
