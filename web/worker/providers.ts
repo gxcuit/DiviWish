@@ -20,10 +20,18 @@ function numeric(value: unknown): number | null {
   return number(Number(value));
 }
 
+class MarketHttpError extends Error {
+  status: number;
+  constructor(status: number) { super(`行情服务 HTTP ${status}`); this.status = status; }
+}
+
 // The timeout covers reading the response body as well as receiving its headers.
 async function load(url: string, encoding = "utf-8", timeout = 12_000): Promise<string> {
   const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(timeout) });
-  if (!response.ok) throw new Error(`行情服务 HTTP ${response.status}`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new MarketHttpError(response.status);
+  }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("行情来源未返回内容");
   const chunks: Uint8Array[] = []; let size = 0;
@@ -97,6 +105,23 @@ export function parseKline(payload: unknown, stock: StockRecord, period: Period)
     adjustment: adjusted in data ? "qfq" : "none", quote: price !== null && price > 0 && day ? { price, quote_date: day } : null };
 }
 
+async function fetchTencentKline(stock: StockRecord, period: Period, param: string): Promise<Kline> {
+  const endpoint = stock.market === "HK" ? "hkfqkline" : "fqkline";
+  const query = new URLSearchParams({ param });
+  const errors: string[] = [];
+  // Same Tencent data and adjustment settings; keep fallback attempts bounded.
+  for (const origin of ["https://ifzq.gtimg.cn", "https://web.ifzq.gtimg.cn"]) {
+    try {
+      const payload = JSON.parse(await load(`${origin}/appstock/app/${endpoint}/get?${query}`, "utf-8", 9000));
+      return parseKline(payload, stock, period);
+    } catch (failure) {
+      if (failure instanceof MarketHttpError && failure.status === 429) throw failure;
+      errors.push(`${new URL(origin).hostname}：${failure instanceof Error ? failure.message : "请求失败"}`);
+    }
+  }
+  throw new Error(`腾讯 K 线暂不可用（${errors.join("；")}）`);
+}
+
 export const providers: Providers = {
   async fetchHistory(stock) {
     const end = historyEnd(), start = yearsBefore(end, 5);
@@ -108,10 +133,7 @@ export const providers: Providers = {
       const bars = [];
       for (let offset = 0; offset < ranges.length; offset += 3) {
         const group = await Promise.all(ranges.slice(offset, offset + 3).map(async range => {
-          const query = new URLSearchParams({ param: `${symbolFor(stock)},day,${range.start},${range.end},640,` });
-          const endpoint = stock.market === "HK" ? "hkfqkline" : "fqkline";
-          const payload = JSON.parse(await load(`https://web.ifzq.gtimg.cn/appstock/app/${endpoint}/get?${query}`, "utf-8", 9000));
-          const data = parseKline(payload, stock, "day");
+          const data = await fetchTencentKline(stock, "day", `${symbolFor(stock)},day,${range.start},${range.end},640,`);
           if (data.adjustment !== "none") throw new Error("历史分位必须使用不复权日线");
           return data.bars.filter(bar => bar.date >= range.start && bar.date <= range.end);
         }));
@@ -148,8 +170,6 @@ export const providers: Providers = {
     return value;
   },
   async fetchKline(stock, period) {
-    const endpoint = stock.market === "HK" ? "hkfqkline" : "fqkline";
-    const query = new URLSearchParams({ param: `${symbolFor(stock)},${period},,,30,qfq` });
-    return parseKline(JSON.parse(await load(`https://web.ifzq.gtimg.cn/appstock/app/${endpoint}/get?${query}`, "utf-8", 9000)), stock, period);
+    return fetchTencentKline(stock, period, `${symbolFor(stock)},${period},,,30,qfq`);
   },
 };

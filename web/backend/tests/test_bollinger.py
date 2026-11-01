@@ -136,3 +136,27 @@ class KlineProviderTests(TestCase):
         payload["data"]["sh600036"]["day"][-1][2] = "NaN"
         with self.assertRaises(ValueError):
             providers.fetch_kline({"code": "600036", "market": "A"}, "day")
+
+
+class KlineFallbackTests(TestCase):
+    @patch("backend.providers.requests.get")
+    def test_http_501_uses_the_second_tencent_origin(self, get):
+        from requests import Response, HTTPError
+        failed = Response(); failed.status_code = 501
+        success = Mock()
+        success.json.return_value = {"code": 0, "data": {"sh600036": {"qfqday": [["2026-10-30", "40", "42"]]}}}
+        get.side_effect = [HTTPError("HTTP 501", response=failed), success]
+        result = providers.fetch_kline({"code": "600036", "market": "A"}, "day")
+        self.assertEqual(result["bars"][0]["close"], 42)
+        self.assertTrue(get.call_args_list[0].args[0].startswith("https://ifzq.gtimg.cn/"))
+        self.assertTrue(get.call_args_list[1].args[0].startswith("https://web.ifzq.gtimg.cn/"))
+        self.assertEqual(get.call_args_list[0].kwargs["params"], get.call_args_list[1].kwargs["params"])
+
+    @patch("backend.providers.requests.get")
+    def test_rate_limits_do_not_trigger_another_request(self, get):
+        from requests import Response, HTTPError
+        limited = Response(); limited.status_code = 429
+        get.side_effect = HTTPError("HTTP 429", response=limited)
+        with self.assertRaises(HTTPError):
+            providers.fetch_kline({"code": "600036", "market": "A"}, "day")
+        self.assertEqual(get.call_count, 1)

@@ -54,11 +54,12 @@ test("partial failures and short histories keep valid timeframes and remain retr
   const f = fixture(); t.after(() => f.db.sqlite.close()); let calls = 0;
   f.source.fetchKline = async (_stock, period) => {
     calls++;
-    if (period === "week") throw new Error("timeout");
+    if (period === "week") throw new Error("行情服务 HTTP 501");
     return { bars: candles(period === "month" ? 5 : 30), adjustment: "none", quote: null };
   };
   const result = await (await f.request("/api/stocks/1/boll")).json();
   assert.equal(result.bands[0].available, true); assert.equal(result.bands[1].available, false);
+  assert.match(result.bands[1].error, /HTTP 501/);
   assert.equal(result.bands[2].count, 5); assert.ok(!("lower" in result.bands[2]));
   assert.equal((await (await f.request("/api/stocks/1/boll")).json()).cached, false); assert.equal(calls, 6);
 });

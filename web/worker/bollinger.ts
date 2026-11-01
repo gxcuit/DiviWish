@@ -49,8 +49,9 @@ export class BollingerService {
         try {
           const data = await source.fetchKline(stock, period);
           return { band: { period, label: PERIODS[period], ...calculateBands(data.bars), adjustment: data.adjustment }, quote: data.quote };
-        } catch {
-          return { band: { period, label: PERIODS[period], available: false, error: "行情数据获取失败，请重试" }, quote: null };
+        } catch (failure) {
+          const reason = failure instanceof Error ? failure.message : "未知行情错误";
+          return { band: { period, label: PERIODS[period], available: false, error: `行情数据获取失败：${reason}，请稍后重试` }, quote: null };
         }
       }));
       const quotes = results.map(row => row.quote).filter((quote): quote is Quote => quote !== null)

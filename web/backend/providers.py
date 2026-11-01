@@ -106,11 +106,21 @@ def fetch_kline(stock, period):
         raise ValueError("无效 K 线周期")
     symbol = symbol_for(stock)
     endpoint = "hkfqkline" if stock["market"] == "HK" else "fqkline"
-    response = requests.get(f"https://web.ifzq.gtimg.cn/appstock/app/{endpoint}/get",
-                            params={"param": f"{symbol},{period},,,30,qfq"},
-                            headers={"User-Agent": "Mozilla/5.0"}, timeout=(3, 6))
-    response.raise_for_status()
-    payload = response.json()
+    errors = []
+    for origin in ("https://ifzq.gtimg.cn", "https://web.ifzq.gtimg.cn"):
+        try:
+            response = requests.get(f"{origin}/appstock/app/{endpoint}/get",
+                                    params={"param": f"{symbol},{period},,,30,qfq"},
+                                    headers={"User-Agent": "Mozilla/5.0"}, timeout=(3, 6))
+            response.raise_for_status()
+            payload = response.json()
+            break
+        except (requests.RequestException, ValueError) as failure:
+            if isinstance(failure, requests.HTTPError) and failure.response is not None and failure.response.status_code == 429:
+                raise
+            errors.append(f"{origin}: {failure}")
+    else:
+        raise ValueError("腾讯 K 线暂不可用（" + "；".join(errors) + "）")
     if payload.get("code", 0) != 0:
         raise ValueError("K 线接口返回错误")
     data = payload.get("data", {}).get(symbol, {})

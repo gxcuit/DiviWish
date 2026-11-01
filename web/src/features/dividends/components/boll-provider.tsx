@@ -23,12 +23,24 @@ export function useBoll(stock: Stock, enabled = true) {
   const state = useSyncExternalStore(subscribe, snapshot, () => EMPTY_BOLL);
   useEffect(() => {
     if (!enabled) return;
-    const load = () => { if (document.visibilityState === "visible") void store.fetch(stock); };
-    load();
+    let active = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      if (document.visibilityState !== "visible") return;
+      await store.fetch(stock);
+      const result = store.get(key);
+      if (active && !retry && (result.error || result.data?.bands.some(band => !band.available))) {
+        retry = setTimeout(() => {
+          retry = undefined;
+          if (active && document.visibilityState === "visible") void store.fetch(stock);
+        }, 5000);
+      }
+    };
+    void load();
     const timer = setInterval(load, 300_000);
     document.addEventListener("visibilitychange", load);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", load); };
-  }, [store, stock, enabled]);
+    return () => { active = false; clearTimeout(retry); clearInterval(timer); document.removeEventListener("visibilitychange", load); };
+  }, [store, stock, key, enabled]);
   const refresh = useCallback(() => store.fetch(stock, true), [store, stock]);
   return { ...state, refresh };
 }

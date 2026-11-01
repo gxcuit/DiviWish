@@ -73,11 +73,11 @@ class BollingerService:
             data = providers.fetch_kline(stock, period)
             band = {**calculate_bands(data["bars"]), "adjustment": data["adjustment"]}
             return {"period": period, "label": PERIODS[period], **band}, data.get("quote")
-        except Exception:
+        except Exception as failure:
             logging.getLogger(__name__).warning("BOLL K-line fetch failed: %s %s", providers.symbol_for(stock), period,
                                                exc_info=True)
             return {"period": period, "label": PERIODS[period], "available": False,
-                    "error": "行情数据获取失败，请重试"}, None
+                    "error": f"行情数据获取失败：{failure}，请稍后重试"}, None
 
     def get(self, stock, force=False):
         key = (stock["market"], stock["code"])
