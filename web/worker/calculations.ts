@@ -74,14 +74,20 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
   const [selectedYield, basisDividend] = selectedBasis(stock, fxRate);
   const gap = selectedYield !== null && target !== null ? selectedYield - target : null;
   const startPrice = number(stock.year_start_price);
-  const values = (stock.history || []).map(row => number(row.yield))
-    .filter((value): value is number => value !== null && value >= 0).sort((a, b) => a - b);
+  // Keep stored annual samples intact; expose a separate series for the saved basis.
+  const history = (stock.history || []).flatMap(row => {
+    const close = number(row.close);
+    const value = stock.yield_basis === "custom"
+      ? basisDividend !== null && close !== null && close > 0 ? basisDividend / close : null
+      : number(stock.yield_basis === "rolling" ? row.rolling_yield : row.yield);
+    return value !== null && Number.isFinite(value) && value >= 0 ? [{ date: row.date, close: row.close, yield: value }] : [];
+  });
+  const values = history.map(row => row.yield).sort((a, b) => a - b);
   const validHistory = values.length >= 60;
   const aPrice = aPrices[stock.a_code ?? ""] || number(stock.a_price);
   const quantile = (probability: number): [number | null, number | null] => {
     const value = validHistory ? values[Math.ceil(probability / 100 * values.length) - 1] : null;
-    let quantilePrice = annual !== null && value && value > 0 ? annual / value : null;
-    if (isHk) quantilePrice = quantilePrice !== null && fxRate ? quantilePrice / fxRate : null;
+    const quantilePrice = basisDividend !== null && value && value > 0 ? basisDividend / value : null;
     return [value, quantilePrice];
   };
   const [q60, p60] = quantile(60), [q90, p90] = quantile(90);
@@ -93,8 +99,11 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     target_price: basisDividend !== null && target && target > 0 ? basisDividend / target : null,
     yield_gap: gap, status: yieldStatus(gap),
     year_change: price && startPrice && startPrice > 0 ? price / startPrice - 1 : null,
-    percentile: validHistory && annualYield !== null ? values.filter(value => value <= annualYield + 1e-12).length / values.length : null,
+    percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
+    percentile_history: history,
+    percentile_start: history[0]?.date ?? null,
+    percentile_end: history.at(-1)?.date ?? null,
     ah_premium: isHk && aPrice && valid ? aPrice / denominator - 1 : null,
     hk_net_yield: isHk && annualYield !== null ? annualYield * 0.9 : null,
     connect_yield: isHk && annualYield !== null && factor !== null ? annualYield * factor : null,

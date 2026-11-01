@@ -86,3 +86,27 @@ test("history backfill retains concurrent settings and rejects changed dividends
   detail = await (await f.request("/api/stocks/1")).json();
   assert.deepEqual(detail.history, []); assert.equal(detail.history_updated_at, undefined);
 });
+
+test("same-day annual caches are upgraded once and switching basis reuses both historical series", async t => {
+  let calls = 0;
+  const f = fixture({ fetchHistory: async () => {
+    calls++;
+    return { ...structuredClone(history), history_version: 2,
+      history_updated_at: new Date(Date.now() + 8 * 3600_000).toISOString(),
+      history: history.history.map((row, i) => ({ ...row, rolling_yield: i < 40 ? 0.03 : 0.09 })) };
+  } });
+  t.after(() => f.db.sqlite.close());
+  f.db.sqlite.prepare("UPDATE stocks SET document=json_set(document,'$.history_updated_at',?) WHERE id=1")
+    .run(new Date(Date.now() + 8 * 3600_000).toISOString());
+  await f.request("/api/stocks/1", "PATCH", { yield_basis: "rolling" });
+  assert.equal((await (await f.request("/api/stocks/1")).json()).percentile, null);
+  const upgraded = await f.request("/api/stocks/1/history", "POST", {});
+  assert.equal(upgraded.status, 200);
+  const detail = await upgraded.json();
+  assert.equal(detail.percentile, 0.5); assert.equal(detail.percentile_count, 80);
+  assert.deepEqual(detail.percentile_history.map((row: { yield: number }) => row.yield), detail.history.map((row: { rolling_yield: number }) => row.rolling_yield));
+  await f.request("/api/stocks/1", "PATCH", { yield_basis: "annual" });
+  assert.equal((await f.request("/api/stocks/1/history", "POST", {})).status, 200);
+  assert.equal(calls, 1);
+  assert.equal((await (await f.request("/api/stocks/1")).json()).percentile_history[0].yield, history.history[0].yield);
+});

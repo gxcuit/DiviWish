@@ -34,3 +34,26 @@ test("grid endpoints use decimal arithmetic, custom cash uses trading currency a
   assert.equal(derive({ ...custom, price: null }, null).target_price, null);
   assert.equal(number(true), null); assert.equal(number("5"), null); assert.equal(number(NaN), null);
 });
+
+test("saved basis drives the percentile, plotted samples and inverse prices without replacing stored annual history", () => {
+  const [a, hk] = sampleStocks();
+  const history = a.history.map((row, i) => ({ ...row, close: [5, 10, 20, 40][i % 4], rolling_yield: [0.03, 0.06, 0.09, 0.12][i % 4] }));
+  const rolling = derive({ ...a, history, yield_basis: "rolling" }, 0.8);
+  near(rolling.percentile, 0.5); near(rolling.quantile_60_yield, 0.09); near(rolling.quantile_60_price, 0.6 / 0.09);
+  assert.deepEqual(rolling.percentile_history.map(row => row.yield), history.map(row => row.rolling_yield));
+  assert.deepEqual(rolling.history, history);
+  const custom = { ...hk, history, yield_basis: "custom" as const, custom_yield: 0.1 };
+  const result = derive(custom, null);
+  near(result.percentile, 0.75); near(result.quantile_60_yield, 0.08); near(result.quantile_60_price, 10);
+  assert.deepEqual(result.percentile_history.slice(0, 4).map(row => row.yield), [0.16, 0.08, 0.04, 0.02]);
+  const refreshed = derive({ ...custom, price: 20 }, null);
+  near(refreshed.percentile, 0.5); near(refreshed.quantile_60_yield, 0.2); near(refreshed.quantile_60_price, 10);
+  const zero = derive({ ...custom, custom_yield: 0 }, null);
+  near(zero.percentile, 1); near(zero.quantile_60_yield, 0); assert.equal(zero.quantile_60_price, null);
+  assert.equal(derive({ ...custom, price: null }, null).percentile, null);
+  const legacy = derive({ ...a, yield_basis: "rolling" }, 0.8);
+  assert.equal(legacy.percentile, null); assert.equal(legacy.percentile_count, 0);
+  assert.equal(legacy.quantile_60_price, null); assert.deepEqual(legacy.percentile_history, []);
+  assert.equal(derive({ ...a, history: history.slice(0, 59), yield_basis: "rolling" }, 0.8).percentile, null);
+  near(derive({ ...hk, history, yield_basis: "rolling" }, 0.8).quantile_60_price, 0.6 / 0.8 / 0.09);
+});

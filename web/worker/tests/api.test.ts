@@ -9,6 +9,7 @@ test("stock CRUD, duplicates, light list and detailed history retain the API con
   const list = await (await f.request("/api/stocks")).json();
   assert.equal(list.stocks[0].dividend_yield, 0.05);
   assert.ok(!("history" in list.stocks[0]));
+  assert.ok(!("percentile_history" in list.stocks[0]));
   assert.ok(!("connect_factor" in list.stocks[1]));
   assert.equal((await (await f.request("/api/stocks/1")).json()).history.length, 80);
   const payload = { code: "600002", name: "手动标的", market: "A", sector: "电力", price: 5, annual_dividend: 0.3, target_yield: 0.05 };
@@ -44,9 +45,12 @@ test("basis, grid, zero custom rates and security edits preserve the established
   assert.equal(response.status, 200);
   let detail = await (await f.request("/api/stocks/1")).json();
   assert.equal(detail.selected_yield, 0.06); assert.equal(detail.dividend_yield, 0.05); assert.ok(Math.abs(detail.target_price - 12) < 1e-12);
-  assert.equal(detail.percentile, 0.75); assert.deepEqual(detail.yield_grid.map((row: { yield: number }) => row.yield), [0.04, 0.045, 0.05, 0.055, 0.06]);
+  assert.equal(detail.percentile, null); assert.equal(detail.percentile_count, 0); assert.deepEqual(detail.yield_grid.map((row: { yield: number }) => row.yield), [0.04, 0.045, 0.05, 0.055, 0.06]);
   assert.equal((await (await f.request("/api/stocks/2")).json()).grid_start, 0.03);
   await f.request("/api/stocks/1", "PATCH", { yield_basis: "custom", custom_yield: 0.08 });
+  detail = await (await f.request("/api/stocks/1")).json();
+  assert.equal(detail.percentile, 1); assert.equal(detail.quantile_60_yield, 0.08); assert.equal(detail.quantile_60_price, 10);
+  assert.ok(detail.percentile_history.every((row: { yield: number }) => row.yield === 0.08));
   response = await f.request("/api/stocks/1", "PATCH", { price: 20 });
   detail = await response.json(); assert.equal(detail.selected_yield, 0.08); assert.equal(detail.target_price, 32);
   await f.request("/api/stocks/1", "PATCH", { custom_yield: 0 });
@@ -96,7 +100,7 @@ test("refresh failure preserves every value; partial success keeps old missing q
   assert.equal(response.status, 200); assert.equal((await response.json()).updated, 1);
   const after = await (await f.request("/api/stocks")).json();
   assert.equal(after.stocks[0].price, 8); assert.equal(after.stocks[0].quote_date, "2026-10-21");
-  assert.equal(after.stocks[0].percentile_end, "2026-10-20");
+  assert.equal(after.stocks[0].percentile_end, before.stocks[0].percentile_end);
   for (const field of ["price", "quote_date", "updated_at", "annual_dividend"]) assert.equal(after.stocks[1][field], before.stocks[1][field]);
   assert.equal(after.stocks[1].ah_premium, 8 / (8 * 0.8) - 1);
 });

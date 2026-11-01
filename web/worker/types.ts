@@ -42,7 +42,7 @@ export interface StockRecord extends Record<string, unknown> {
   source: string;
   verification_note: string | null;
   dividends: Record<string, unknown>[];
-  history: { date: string; yield: number; close: number }[];
+  history: { date: string; yield: number; close: number; rolling_yield?: number }[];
   connect_factor: number | null;
   grid_start: number;
   grid_end: number;
@@ -82,7 +82,8 @@ export type Bar = { date: string; close: number };
 export type Kline = { bars: Bar[]; adjustment: "qfq" | "none"; quote: Quote | null };
 export type Suggestion = Pick<StockRecord, "name" | "code" | "market">;
 export interface HistorySnapshot {
-  history: { date: string; yield: number; close: number; annual: number; year: number }[];
+  history: { date: string; yield: number; close: number; annual: number; year: number; rolling_yield?: number }[];
+  history_version?: number;
   percentile_start: string;
   percentile_end: string;
   history_source: string;

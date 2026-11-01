@@ -33,12 +33,15 @@ export function buildHistory(events: DividendEvent[], prices: Bar[], asOf: strin
     const year = Number(latest.slice(0, 4));
     if (Number(day.slice(0, 4)) - year > 2) continue;
     const annual = Math.round([...active.values()].filter(event => event.period.startsWith(`${year}-`)).reduce((sum, event) => sum + event.cash, 0) * 1e8) / 1e8;
-    history.push({ date: day, close, annual, year, yield: annual / close });
+    const latestPeriod = [...active.keys()].sort().at(-1)!;
+    const cutoff = yearsBefore(latestPeriod, 1);
+    const rolling = Math.round([...active.values()].filter(event => event.period > cutoff && event.period <= latestPeriod).reduce((sum, event) => sum + event.cash, 0) * 1e8) / 1e8;
+    history.push({ date: day, close, annual, year, yield: annual / close, rolling_yield: rolling / close });
   }
   if (history.length < 60) throw new Error(`有效历史样本仅 ${history.length} 个交易日，至少需要 60 个`);
   const end = history.at(-1)!.date;
   if (Date.parse(asOf) - Date.parse(end) > 21 * 86400_000) throw new Error(`历史行情仅截至 ${end}，未使用过旧数据`);
-  return { history, percentile_start: history[0].date, percentile_end: end, history_updated_at: timestamp(),
+  return { history, history_version: 2, percentile_start: history[0].date, percentile_end: end, history_updated_at: timestamp(),
     history_source: "腾讯不复权日线；东方财富公开分红披露记录",
-    history_note: "按当时已披露完整年度股息 ÷ 不复权收盘价；公告后下一交易日生效，仅纳入今日之前的完成交易日。按现存分红记录回溯，非逐日方案版本快照；送转配股可能影响名义每股口径。" };
+    history_note: "年度与滚动年度按当时已披露分红计算，公告后下一交易日生效，仅纳入今日之前的完成交易日。按现存分红记录回溯，非逐日方案版本快照；送转配股可能影响名义每股口径。" };
 }
