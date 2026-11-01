@@ -18,6 +18,19 @@ test("history uses each day's disclosed full fiscal-year cash and activates noti
   assert.equal(result.history.find(sample => sample.date === "2026-03-02")!.yield, 0.2);
   assert.equal(result.history[0].annual, 1); assert.equal(result.history.at(-1)!.annual, 2);
   assert.equal(result.history.at(-1)!.year, 2025);
+  assert.equal(result.history_version, 2);
+  assert.equal(result.history.find(sample => sample.date === "2026-03-01")!.rolling_yield, 0.15);
+  assert.equal(result.history.find(sample => sample.date === "2026-03-02")!.rolling_yield, 0.2);
+});
+
+test("rolling history uses report periods with an open left endpoint, including zero-cash declarations", () => {
+  const result = buildHistory([
+    { period: "2024-06-30", available: "2024-08-01", cash: 9 },
+    { period: "2024-12-31", available: "2025-03-01", cash: 1 },
+    { period: "2025-06-30", available: "2025-08-01", cash: 0 },
+  ], prices, "2026-03-31");
+  assert.ok(result.history.every(sample => sample.rolling_yield === 0.1));
+  assert.ok(result.history.every(sample => sample.yield === 1));
 });
 
 test("historical windows, leap years, zero dividends, missing/full-year gaps and invalid/short/stale prices are explicit", () => {

@@ -14,6 +14,7 @@ export interface StockPreview {
 }
 
 export interface Stock {
+  history_version?: number;
   history_updated_at?: string;
   history_note?: string;
   history_source?: string;
@@ -64,6 +65,7 @@ export interface Stock {
 }
 
 export interface StockDetail extends Stock {
+  percentile_history: { date: string; yield: number; close: number }[];
   yield_grid: { yield: number; price: number | null; reached: boolean | null }[];
   dividends: DividendPart[];
   history: { date: string; yield: number; close: number }[];
