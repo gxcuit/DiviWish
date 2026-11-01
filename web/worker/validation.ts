@@ -69,7 +69,7 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
   if (changed(["rolling_dividend"])) stock.dividend_hkd_rolling = 0;
   if (changed(["annual_dividend", "code", "market"])) {
     for (const field of ["history_source", "history_updated_at", "history_note"]) delete stock[field];
-    for (const field of ["dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling"]) delete stock[field];
+    for (const field of ["dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"]) delete stock[field];
     Object.assign(stock, { dividends: [], history: [], percentile_start: null, percentile_end: null, annual_year: null,
       source: "手动编辑（分红或证券身份已变更，历史对比已清除）", verification_note: "手动分红需自行核实；相关历史对比已清除。" });
     if (!("rolling_dividend" in input)) stock.rolling_dividend = null;
@@ -78,10 +78,11 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
       for (const field of ["price", "annual_dividend", "ex_dividend_date", "year_start_price", "a_code"] as const) {
         if (!(field in input)) stock[field] = null;
       }
-      Object.assign(stock, { quote_date: null, change_pct: null });
+      Object.assign(stock, { quote_date: null, change_pct: null, year_start_year: null, year_start_date: null, year_start_adjustment: null });
       if (!("yield_basis" in input)) Object.assign(stock, YIELD_DEFAULTS);
     }
   }
+  if ("year_start_price" in input) Object.assign(stock, { year_start_year: null, year_start_date: null, year_start_adjustment: null });
   if ("price" in input && (!existing || input.price !== existing.price)) {
     Object.assign(stock, { quote_date: null, change_pct: null, source: "手动报价；交易日期待核实" });
   }

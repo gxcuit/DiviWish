@@ -1,3 +1,4 @@
+import { payoutMetrics } from "./financial-metrics.ts";
 import type { StockRecord } from "./types.ts";
 
 export const GRID_DEFAULTS = { grid_start: 0.03, grid_end: 0.08, grid_step: 0.005 };
@@ -98,7 +99,8 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     dividend_yield: annualYield, rolling_yield: rollingYield,
     target_price: basisDividend !== null && target && target > 0 ? basisDividend / target : null,
     yield_gap: gap, status: yieldStatus(gap),
-    year_change: price && startPrice && startPrice > 0 ? price / startPrice - 1 : null,
+    ...payoutMetrics(stock),
+    year_change: price && startPrice && startPrice > 0 && (!stock.year_start_year || stock.year_start_year === Number(stock.quote_date?.slice(0, 4))) ? price / startPrice - 1 : null,
     percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
     percentile_history: history,

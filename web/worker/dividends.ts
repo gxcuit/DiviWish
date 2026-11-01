@@ -10,6 +10,8 @@ interface Event {
   notice: string | null;
   amount: () => number;
   hkdAmount?: () => number;
+  nativeCash?: { amount: number; currency: string };
+  eps?: number | null;
 }
 const round = (value: number) => Math.round(value * 1e8) / 1e8;
 const date = (value: unknown) => typeof value === "string" ? dateString(value.slice(0, 10).replaceAll("/", "-")) : null;
@@ -35,6 +37,12 @@ function cashHk(row: Row, fx: number | null): { cny: number; hkd: number } {
   const hkd = text.match(/(?:港币|港幣|港元|HKD)\s*(\d+(?:\.\d+)?)(?:\s*元)?/i);
   if (hkd && fx !== null && Number.isFinite(fx) && fx > 0 && fx < 10) return { cny: round(Number(hkd[1]) * fx), hkd: Number(hkd[1]) };
   throw new Error(hkd ? "港币分红缺少有效汇率，保留原分红" : "分红币种或金额无法确认，保留原分红");
+}
+function nativeCash(row: Row): { amount: number; currency: string } | undefined {
+  const match = String(row.PLAN_EXPLAIN ?? "").match(/^每股(?:派)?\s*(人民币|人民幣|RMB|CNY|港币|港幣|港元|HKD|美元|USD)\s*(\d+(?:\.\d+)?)/i);
+  if (!match) return undefined;
+  const currency = /人民币|人民幣|RMB|CNY/i.test(match[1]) ? "CNY" : /美元|USD/i.test(match[1]) ? "USD" : "HKD";
+  return { amount: Number(match[2]), currency };
 }
 function hkPeriod(row: Row): string | null {
   const year = String(row.YEAR ?? ""), type = String(row.REPORT_TYPE ?? "");
@@ -69,7 +77,9 @@ export function parseDividends(rows: Row[], stock: Pick<StockRecord, "code" | "m
     const implemented = stock.market === "A" ? /实施分配|特别分配|不分配|不分红/.test(progress) : Boolean(exDate && exDate <= today);
     const confirmed = /不分配|不分红/.test(progress) || Boolean(implemented && exDate && exDate <= today);
     const status = stock.market === "A" ? progress : exDate && exDate <= today ? "已除净" : "已公告，待除净";
+    const rawEps = typeof row.BASIC_EPS === "number" || typeof row.BASIC_EPS === "string" && String(row.BASIC_EPS).trim() ? Number(row.BASIC_EPS) : NaN;
     const next: Event = { period, status, confirmed, exDate, notice,
+      eps: Number.isFinite(rawEps) ? rawEps : null, nativeCash: nativeCash(row),
       amount: () => stock.market === "A" ? cashA(row) : cashHk(row, fxRate).cny,
       ...(stock.market === "HK" ? { hkdAmount: () => cashHk(row, fxRate).hkd } : {}) };
     const previous = events.get(period);
@@ -86,23 +96,30 @@ export function parseDividends(rows: Row[], stock: Pick<StockRecord, "code" | "m
   const cutoff = `${Number(latest.slice(0, 4)) - 1}${latest.slice(4)}`;
   const rolling = [...events.values()].filter(event => event.period > cutoff && event.period <= latest);
   const total = (parts: Event[]) => round(parts.reduce((sum, event) => sum + event.amount(), 0));
+  const nativeParts = annual.filter(event => event.amount() !== 0);
+  const payoutCurrency = nativeParts[0]?.nativeCash?.currency ?? null;
+  const nativeValid = nativeParts.every(event => event.nativeCash && event.nativeCash.currency === payoutCurrency);
   return { annual_dividend: total(annual), rolling_dividend: total(rolling), annual_year: year,
     confirmed: annual.every(event => event.confirmed), ex_dividend_date: [...events.values()].map(event => event.exDate).filter((value): value is string => value !== null).sort().at(-1) ?? null,
     dividends: annual.map(event => ({ period: event.period, dps: round(event.amount()), status: event.status, ...(event.exDate ? { date: event.exDate } : {}), ...(event.hkdAmount ? { hkd_dps: event.hkdAmount() } : {}) })),
     dividend_hkd_annual: round(annual.reduce((sum, event) => sum + (event.hkdAmount?.() ?? 0), 0)),
     dividend_hkd_rolling: round(rolling.reduce((sum, event) => sum + (event.hkdAmount?.() ?? 0), 0)),
+    annual_eps: stock.market === "A" ? events.get(annualPeriod)?.eps ?? null : null,
+    annual_eps_year: year, annual_eps_currency: stock.market === "A" ? "CNY" : null,
+    payout_dividend: nativeValid ? round(nativeParts.reduce((sum, event) => sum + event.nativeCash!.amount, 0)) : null,
+    payout_currency: nativeValid ? payoutCurrency : null,
     dividend_source: source, dividend_updated_at: timestamp(), dividend_fx_rate: stock.market === "HK" ? fxRate : null,
   };
 }
 
 // Bound public upstream JSON; a missing/error response never becomes a zero dividend.
-async function report(reportName: string, code: string, hk: boolean): Promise<{ rows: Row[]; source: string }> {
+async function report(reportName: string, code: string, hk: boolean, extraFilter = ""): Promise<{ rows: Row[]; source: string }> {
   const query = new URLSearchParams({ reportName, columns: "ALL", pageNumber: "1", pageSize: "100", source: hk ? "F10" : "WEB", client: "PC",
-    filter: reportName.endsWith("SECURITYINFO") ? `(SECUCODE="${code}.HK")` : `(SECURITY_CODE="${code}")${hk ? '(IS_BFP="0")' : ""}`,
-    ...(reportName.endsWith("SECURITYINFO") ? {} : { sortColumns: hk ? "NOTICE_DATE,EX_DIVIDEND_DATE" : "REPORT_DATE", sortTypes: hk ? "-1,-1" : "-1" }) });
+    filter: extraFilter || (reportName.endsWith("SECURITYINFO") ? `(SECUCODE="${code}.HK")` : `(SECURITY_CODE="${code}")${hk ? '(IS_BFP="0")' : ""}`),
+    ...(reportName.endsWith("SECURITYINFO") ? {} : { sortColumns: hk && !extraFilter ? "NOTICE_DATE,EX_DIVIDEND_DATE" : "REPORT_DATE", sortTypes: hk && !extraFilter ? "-1,-1" : "-1" }) });
   const source = `${hk ? "https://datacenter.eastmoney.com/securities" : "https://datacenter-web.eastmoney.com"}/api/data/v1/get?${query}`;
   const response = await fetch(source, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new Error(`分红来源 HTTP ${response.status}`);
+  if (!response.ok) { await response.body?.cancel(); throw new Error(`分红来源 HTTP ${response.status}`); }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("分红来源未返回内容");
   let size = 0;
@@ -132,7 +149,26 @@ export async function fetchDividends(stock: StockRecord, fetchFx: () => Promise<
     report("RPT_HKF10_MAIN_DIVBASIC", stock.code, true), report("RPT_HKF10_INFO_SECURITYINFO", stock.code, true), fetchFx().catch(() => null),
   ]);
   const fiscalEnd = String(profile.rows[0]?.YEAR_SETTLE_DAY ?? "");
-  return parseDividends(result.rows, stock, { fiscalEnd, fxRate, source: result.source });
+  const snapshot = parseDividends(result.rows, stock, { fiscalEnd, fxRate, source: result.source });
+  // Raw income statements identify EPS currency; the summary's CURRENCY is a trading-currency label.
+  try {
+    const financial = await report("RPT_HKF10_FN_INCOME", stock.code, true,
+      `(SECUCODE="${stock.code}.HK")(REPORT_DATE='${snapshot.annual_year}-12-31')(ITEM_NAME="每股基本盈利")`);
+    Object.assign(snapshot, parseHkEarnings(financial.rows, stock.code, snapshot.annual_year));
+  } catch { /* Preserve verified dividends; the UI explains unavailable earnings. */ }
+  return snapshot;
+}
+
+/** Require an actual full-year income statement in its original reporting currency. */
+export function parseHkEarnings(rows: Row[], code: string, year: number) {
+  const matches = rows.filter(row => String(row.SECURITY_CODE) === code && date(row.REPORT_DATE) === `${year}-12-31`
+    && date(row.START_DATE) === `${year}-01-01` && row.ITEM_NAME === "每股基本盈利" && row.DATE_TYPE_CODE === "001"
+    && ["CNY", "HKD", "USD"].includes(String(row.CURRENCY_CODE)));
+  if (matches.length !== 1) throw new Error("缺少同财年、同币种的基本每股收益");
+  const raw = matches[0].AMOUNT;
+  const eps = typeof raw === "number" || typeof raw === "string" && raw.trim() ? Number(raw) : NaN;
+  if (!Number.isFinite(eps)) throw new Error("每股收益缺失");
+  return { annual_eps: eps, annual_eps_year: year, annual_eps_currency: String(matches[0].CURRENCY_CODE) };
 }
 
 export function parseHistoricalDividends(rows: Row[], stock: Pick<StockRecord, "code" | "market">, asOf: string): DividendEvent[] {

@@ -48,6 +48,10 @@ export interface Stock {
   annual_year: number | null;
   year_start_price: number | null;
   year_change: number | null;
+  year_start_date?: string | null;
+  year_start_adjustment?: string | null;
+  payout_ratio?: number | null;
+  payout_note?: string;
   percentile: number | null;
   percentile_start: string | null;
   percentile_end: string | null;

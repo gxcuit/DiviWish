@@ -1,5 +1,6 @@
 import { fetchDividends, fetchHistoricalDividends } from "./dividends.ts";
 import { buildHistory, historyEnd, yearsBefore } from "./history.ts";
+import { yearBaseline } from "./financial-metrics.ts";
 import { number } from "./calculations.ts";
 import { dateString } from "./validation.ts";
 import type { Kline, Period, Providers, Quote, StockRecord, Suggestion } from "./types.ts";
@@ -105,14 +106,14 @@ export function parseKline(payload: unknown, stock: StockRecord, period: Period)
     adjustment: adjusted in data ? "qfq" : "none", quote: price !== null && price > 0 && day ? { price, quote_date: day } : null };
 }
 
-async function fetchTencentKline(stock: StockRecord, period: Period, param: string): Promise<Kline> {
+async function fetchTencentKline(stock: StockRecord, period: Period, param: string, timeout = 9000): Promise<Kline> {
   const endpoint = stock.market === "HK" ? "hkfqkline" : "fqkline";
   const query = new URLSearchParams({ param });
   const errors: string[] = [];
   // Same Tencent data and adjustment settings; keep fallback attempts bounded.
   for (const origin of ["https://ifzq.gtimg.cn", "https://web.ifzq.gtimg.cn"]) {
     try {
-      const payload = JSON.parse(await load(`${origin}/appstock/app/${endpoint}/get?${query}`, "utf-8", 9000));
+      const payload = JSON.parse(await load(`${origin}/appstock/app/${endpoint}/get?${query}`, "utf-8", timeout));
       return parseKline(payload, stock, period);
     } catch (failure) {
       if (failure instanceof MarketHttpError && failure.status === 429) throw failure;
@@ -160,6 +161,26 @@ export const providers: Providers = {
       } catch {
         errors.push(...group.map(stock => `${stock.code}：腾讯行情请求失败，保留旧报价`));
       }
+    }
+    const deadline = Date.now() + 30_000;
+    const quoted = stocks.filter(stock => quotes.has(stock.id!));
+    for (let offset = 0; offset < quoted.length; offset += 4) {
+      if (Date.now() >= deadline) {
+        for (const stock of quoted.slice(offset)) {
+          Object.assign(quotes.get(stock.id!)!, { year_start_price: null, year_start_date: null, year_start_year: null, year_start_adjustment: null });
+        }
+        errors.push("部分年初基准尚未查询，请再次刷新"); break;
+      }
+      await Promise.all(quoted.slice(offset, offset + 4).map(async stock => {
+        const quote = quotes.get(stock.id!)!;
+        // Clear stale baselines even when the provider fails at a year boundary.
+        Object.assign(quote, { year_start_price: null, year_start_date: null, year_start_year: null, year_start_adjustment: null });
+        try {
+          const year = Number(quote.quote_date!.slice(0, 4));
+          const data = await fetchTencentKline(stock, "day", `${symbolFor(stock)},day,${year - 1}-12-01,,640,qfq`, 4500);
+          Object.assign(quote, yearBaseline(data, quote));
+        } catch { errors.push(`${stock.code}：上年末价格基准获取失败，年内涨跌暂不可计算`); }
+      }));
     }
     return { quotes, errors };
   },

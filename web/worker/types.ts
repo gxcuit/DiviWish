@@ -74,9 +74,15 @@ export interface DividendSnapshot {
   dividend_fx_rate: number | null;
   dividend_hkd_annual?: number;
   dividend_hkd_rolling?: number;
+  annual_eps?: number | null;
+  annual_eps_year?: number | null;
+  annual_eps_currency?: string | null;
+  payout_dividend?: number | null;
+  payout_currency?: string | null;
 }
 
-export type Quote = { price: number; change_pct?: number | null; quote_date: string | null };
+export type Quote = { price: number; change_pct?: number | null; quote_date: string | null;
+  year_start_price?: number | null; year_start_date?: string | null; year_start_year?: number | null; year_start_adjustment?: string | null };
 export type Period = "day" | "week" | "month";
 export type Bar = { date: string; close: number };
 export type Kline = { bars: Bar[]; adjustment: "qfq" | "none"; quote: Quote | null };

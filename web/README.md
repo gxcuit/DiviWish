@@ -154,3 +154,7 @@ npm run check
 | `backend/` | 保留的 Flask 历史实现和原个人数据，不用于默认启动 |
 
 更多说明：[单机架构](docs/architecture.md)、[股息计算](docs/calculations.md)、[分支约定](docs/branches.md)。命令背景可参考 [npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[Node SQLite](https://nodejs.org/api/sqlite.html) 和 [Dockerfile](https://docs.docker.com/reference/dockerfile/) 官方文档。
+
+### 年内涨跌与股息支付率（2026-11-01）
+
+个股详情增加年度股息支付率及财年、币种与每股估算口径说明。刷新行情与股息会自动补齐上年末交易日价格基准，修复新增股票年内涨跌一直显示“—”的问题；基准日期与复权方式随数值显示。缺失数据及非正收益会给出原因，详见 [计算口径](docs/calculations.md#年内涨跌与股息支付率)。

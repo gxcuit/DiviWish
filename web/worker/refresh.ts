@@ -4,9 +4,9 @@ import { HttpError, json } from "./http.ts";
 import { timestamp } from "./validation.ts";
 import type { DividendSnapshot, Providers, StockRecord, StockRow } from "./types.ts";
 
-const QUOTE_FIELDS = ["price", "change_pct", "quote_date"];
+const QUOTE_FIELDS = ["price", "change_pct", "quote_date", "year_start_price", "year_start_year", "year_start_date", "year_start_adjustment"];
 const DIVIDEND_FIELDS = ["annual_dividend", "rolling_dividend", "annual_year", "confirmed", "ex_dividend_date", "dividends",
-  "dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling"];
+  "dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"];
 const unchanged = (before: StockRecord, after: StockRecord, keys: string[]) =>
   keys.every(key => JSON.stringify(before[key]) === JSON.stringify(after[key]));
 
