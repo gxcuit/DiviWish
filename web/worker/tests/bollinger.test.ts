@@ -35,6 +35,21 @@ test("BOLL lazily loads independent timeframes, caches successes, bypasses cache
   await f.request("/api/stocks/1/boll"); assert.equal(calls, 12);
 });
 
+test("near bands and middle use inclusive 5% full-width thresholds without confusing proximity with a touch", () => {
+  const band = { available: true, lower: 45, middle: 50, upper: 55 };
+  const cases: [number, string][] = [
+    [44.99, "below_lower"], [45, "at_lower"], [45.5, "near_lower"], [45.50001, "lower_half"],
+    [49.49999, "lower_half"], [49.5, "at_middle"], [50.5, "at_middle"], [50.50001, "upper_half"],
+    [54.49999, "upper_half"], [54.5, "near_upper"], [55, "at_upper"], [55.01, "above_upper"],
+  ];
+  for (const [price, expected] of cases) {
+    assert.equal(pricePosition(band, price).position, expected, String(price));
+    const scaled = { ...band, lower: 450, middle: 500, upper: 550 };
+    assert.equal(pricePosition(scaled, price * 10).position, expected);
+  }
+  for (const missing of [null, NaN, Infinity]) assert.equal(pricePosition(band, missing).position, "unknown");
+});
+
 test("partial failures and short histories keep valid timeframes and remain retryable", async t => {
   const f = fixture(); t.after(() => f.db.sqlite.close()); let calls = 0;
   f.source.fetchKline = async (_stock, period) => {

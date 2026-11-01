@@ -24,12 +24,15 @@ function close(a: number, b: number, absolute = 0): boolean {
 }
 
 export function pricePosition(band: Band, price: number | null) {
-  if (price === null) return { position: "unknown", percent_b: null };
+  if (price === null || !Number.isFinite(price)) return { position: "unknown", percent_b: null };
   const lower = band.lower!, middle = band.middle!, upper = band.upper!;
   const flat = close(lower, upper, 1e-12);
   const position = price < lower && !close(price, lower) ? "below_lower" :
     price > upper && !close(price, upper) ? "above_upper" : flat ? "flat" :
-      close(price, lower) ? "at_lower" : close(price, upper) ? "at_upper" : close(price, middle) ? "at_middle" :
+      close(price, lower) ? "at_lower" : close(price, upper) ? "at_upper" :
+        price - lower <= (upper - lower) * 0.05 + 1e-12 ? "near_lower" :
+          upper - price <= (upper - lower) * 0.05 + 1e-12 ? "near_upper" :
+            Math.abs(price - middle) <= (upper - lower) * 0.05 + 1e-12 ? "at_middle" :
         price < middle ? "lower_half" : "upper_half";
   return { position, percent_b: flat ? null : (price - lower) / (upper - lower) };
 }
