@@ -573,3 +573,70 @@ test("new account and its defaults roll back together if a starter insert fails"
   const success = await f.register("rollback@example.test", PASSWORD, true);
   assert.equal((await (await f.request("/api/stocks", "GET", undefined, success.cookie)).json()).stocks.length, 2);
 });
+
+
+test("portfolio dividend continuation persists across handlers, ignores single refreshes and stays account-owned", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register();
+  const bob = await f.register("bob@example.test");
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  let calls: string[] = [];
+  f.source.fetchQuotes = async () => ({ quotes: new Map(), errors: [] });
+  f.source.fetchDividends = async stock => {
+    calls.push(stock.code);
+    if (calls.length % 4 === 0) now += 20_000;
+    return structuredClone(DIVIDEND);
+  };
+  const ids: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const response = await f.request("/api/stocks", "POST", { code: String(600001 + i), market: "A", name: `股票${i}`, sector: "银行" }, alice.cookie);
+    assert.equal(response.status, 201);
+    ids.push((await response.json()).id);
+  }
+  const bobStock = await (await f.request("/api/stocks", "POST", { code: "600001", market: "A", name: "Bob股票", sector: "银行" }, bob.cookie)).json();
+  const first = await (await f.request("/api/refresh", "POST", {}, alice.cookie)).json();
+  assert.equal(first.dividends_updated, 8);
+  assert.ok(first.errors.some((error: string) => error.includes("其余 4 支")));
+  assert.equal(f.db.sqlite.prepare("SELECT count(*) AS n FROM user_metadata WHERE user_id=? AND key='dividend_refresh_cursor'").get(bob.user.id)!.n, 0);
+  await f.request(`/api/stocks/${ids[11]}/refresh`, "POST", {}, alice.cookie);
+  await f.request(`/api/stocks/${ids[7]}`, "DELETE", undefined, alice.cookie);
+  calls = [];
+  const restarted = createHandler(f.source, { clock: () => f.state.now });
+  const response = await restarted(new Request("http://localhost/api/refresh", {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: alice.cookie }, body: "{}",
+  }), f.env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls.slice(0, 4), ["600009", "600010", "600011", "600012"]);
+  for (const id of ids.slice(8)) assert.equal((await (await f.request(`/api/stocks/${id}`, "GET", undefined, alice.cookie)).json()).annual_dividend, 2.7);
+  assert.equal((await (await f.request(`/api/stocks/${bobStock.id}`, "GET", undefined, bob.cookie)).json()).annual_dividend, null);
+  calls = [];
+  assert.equal((await f.request("/api/refresh", "POST", {}, bob.cookie)).status, 200);
+  assert.deepEqual(calls, ["600001"]);
+});
+
+test("failed dividend batches advance only the owner's continuation without changing stock data or refresh dates", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const { cookie, user } = await f.register();
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  let calls: string[] = [];
+  f.source.fetchQuotes = async () => ({ quotes: new Map(), errors: [] });
+  f.source.fetchDividends = async stock => {
+    calls.push(stock.code); now += 40_000;
+    throw new Error("offline");
+  };
+  const ids: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    const saved = await (await f.request("/api/stocks", "POST", { code: String(600001 + i), market: "A", name: `股票${i}`, sector: "银行", annual_dividend: 0.8 }, cookie)).json();
+    ids.push(saved.id);
+  }
+  const before = await (await f.request(`/api/stocks/${ids[0]}`, "GET", undefined, cookie)).json();
+  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
+  assert.equal(calls.length, 4);
+  assert.deepEqual(await (await f.request(`/api/stocks/${ids[0]}`, "GET", undefined, cookie)).json(), before);
+  assert.equal(f.db.sqlite.prepare("SELECT value FROM user_metadata WHERE user_id=? AND key='last_refresh'").get(user.id), undefined);
+  calls = [];
+  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
+  assert.equal(calls[0], "600005");
+});
