@@ -20,7 +20,7 @@ export function EtfDividendDetails({ stock, historyState, onRetry }: { stock: St
     <p className={styles.muted}>现金分红合计按可核实的拆分比例折算至统计日份额；原始逐次金额保留分红时口径。ETF 实际派息率与跟踪指数股息率不同。</p>
     {stock.dividend_note && <p className={stock.dividend_verification === "matched" ? styles.muted : styles.formError} role="status">{stock.dividend_note}</p>}
     {stock.verification_note && <p className={styles.formError}>{stock.verification_note}</p>}
-    <EtfHistory key={stock.id} stock={stock} state={historyState} onRetry={onRetry} />
+    <EtfHistory key={`${stock.id}-${stock.yield_basis}`} stock={stock} state={historyState} onRetry={onRetry} />
     <h3>逐次现金分红（人民币／份）</h3>
     {stock.dividends.length ? <div className={styles.dividendParts}>{stock.dividends.map(part => <div key={part.date || part.period}>
       <span>除息 {part.date || part.period}<small>{part.status} · 登记 {part.record_date || "—"}<br />发放 {part.pay_date || "—"}</small></span><strong>{cash(part.dps)}</strong>

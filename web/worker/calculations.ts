@@ -76,22 +76,29 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
   const gap = selectedYield !== null && target !== null ? selectedYield - target : null;
   const startPrice = number(stock.year_start_price);
   const etf = stock.instrument_type === "etf";
-  const historyDividend = etf ? rolling : basisDividend;
-  const currentYield = etf ? rollingYield : selectedYield;
-  // ETF history is always trailing cash by ex-date, independent of the list/grid basis.
-  const history = (etf && (stock.history_version !== 3 || stock.history_status !== "ready") ? [] : stock.history || []).flatMap(row => {
+  // Each saved basis drives the same series, numerator, percentile and prices.
+  // Version 3 only had ETF rolling history; never reinterpret it as annual.
+  const supported = !etf || stock.history_status === "ready" &&
+    (stock.history_version === 4 || stock.history_version === 3 && stock.yield_basis !== "annual");
+  const history = (supported ? stock.history || [] : []).flatMap(row => {
     const close = number(row.close);
-    const value = etf ? number(row.rolling_yield) : stock.yield_basis === "custom"
+    const value = stock.yield_basis === "custom"
       ? basisDividend !== null && close !== null && close > 0 ? basisDividend / close : null
       : number(stock.yield_basis === "rolling" ? row.rolling_yield : row.yield);
-    return value !== null && Number.isFinite(value) && value >= 0 ? [{ date: row.date, close: row.close, yield: value }] : [];
+    return value !== null && Number.isFinite(value) && value >= 0 ? [{ date: row.date, close: row.close, yield: value,
+      ...(etf && stock.yield_basis === "rolling" ? { window_status: row.window_status } : {}) }] : [];
   });
   const values = history.map(row => row.yield).sort((a, b) => a - b);
-  const validHistory = values.length >= 60 && (!etf || values.some(value => value > 0));
+  const hasPositive = values.some(value => value > 0);
+  const validHistory = values.length >= 60 && (!etf || hasPositive);
+  const unavailable = !etf ? null : stock.history_status === "not_applicable" ? "查询成功，暂无可用于所选口径的现金派息历史，分位不适用。" : !supported ? "该口径历史尚未就绪，请获取或升级历史数据。"
+    : values.length < 60 ? `该口径有效历史样本仅 ${values.length} 日，至少需要60日。`
+    : !hasPositive ? "所选口径历史派息率均为零，分位不适用。"
+    : selectedYield === null ? "所选口径当前派息率缺失，暂不能计算当前分位。" : null;
   const aPrice = aPrices[stock.a_code ?? ""] || number(stock.a_price);
   const quantile = (probability: number): [number | null, number | null] => {
     const value = validHistory ? values[Math.ceil(probability / 100 * values.length) - 1] : null;
-    const quantilePrice = historyDividend !== null && value && value > 0 ? historyDividend / value : null;
+    const quantilePrice = basisDividend !== null && value && value > 0 ? basisDividend / value : null;
     return [value, quantilePrice];
   };
   const [q60, p60] = quantile(60), [q90, p90] = quantile(90);
@@ -104,8 +111,9 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     yield_gap: gap, status: yieldStatus(gap),
     ...stock.instrument_type === "etf" ? { payout_ratio: null, payout_note: "ETF 不适用个股股息支付率" } : payoutMetrics(stock),
     year_change: price && startPrice && startPrice > 0 && (!stock.year_start_year || stock.year_start_year === Number(stock.quote_date?.slice(0, 4))) ? price / startPrice - 1 : null,
-    percentile: validHistory && currentYield !== null ? values.filter(value => value <= currentYield + 1e-12).length / values.length : null,
+    percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
+    ...(etf ? { percentile_unavailable_reason: unavailable } : {}),
     percentile_history: history,
     percentile_start: history[0]?.date ?? null,
     percentile_end: history.at(-1)?.date ?? null,

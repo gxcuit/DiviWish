@@ -184,3 +184,8 @@
 .etfLegend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin: 8px 0; font-size: 11px; }
 .etfLegend span:first-child { color: #b45309; }
 .etfLegend span:last-child { color: #7c3aed; }
+
+.windowNote { padding: 10px 12px; background: #fffbeb; border-radius: 8px; color: #92400e; font-size: 12px; line-height: 1.7; }
+.windowSummary { margin: 12px 0; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+.windowSummary summary { cursor: pointer; font-weight: 600; }
+.windowSummary button { display: block; text-align: left; padding: 7px 0; color: #92400e; text-decoration: underline; }

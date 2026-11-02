@@ -22,7 +22,7 @@ test("ETF history fetches unadjusted daily prices, retains primary on secondary 
     return new Response(JSON.stringify({ code: 0, data: { sh510880: { [adjusted ? "qfqday" : "day"]: rows } } }));
   });
   const result = await providers.fetchHistory!(stock);
-  assert.equal(result.history_version, 3);
+  assert.equal(result.history_version, 4);
   assert.equal(result.history_status, "ready");
   assert.equal(result.history.length, 90);
   assert.match(result.history_note, /核验暂不可用/);

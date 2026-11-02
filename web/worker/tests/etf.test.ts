@@ -156,7 +156,7 @@ test("account ETF records remain private and cannot be read or refreshed by anot
 
 test("ETF history caches success/not-applicable, supports forced retry, and rejects concurrent cash edits", async t => {
   let calls = 0;
-  const f = await fixture({ fetchHistory: async () => { calls++; return { history: [], history_version: 3, history_status: "not_applicable", percentile_start: "", percentile_end: "", history_updated_at: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10) + "T10:00:00+08:00", history_source: "test", history_note: "查询成功，无分红" }; } });
+  const f = await fixture({ fetchHistory: async () => { calls++; return { history: [], history_version: 4, history_status: "not_applicable", percentile_start: "", percentile_end: "", history_updated_at: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10) + "T10:00:00+08:00", history_source: "test", history_note: "查询成功，无分红" }; } });
   t.after(() => f.db.sqlite.close());
   const saved = await (await f.request("/api/stocks", "POST", { code: "512890", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector: "ETF", price: 1, rolling_dividend: 0 })).json();
   const url = `/api/stocks/${saved.id}/history`;
@@ -185,7 +185,7 @@ test("ETF ready histories survive outages, retain concurrent watch settings and 
   await f.request(`/api/stocks/${saved.id}/refresh`, "POST", {});
   f.source.fetchHistory = async () => {
     await f.request(`/api/stocks/${saved.id}`, "PATCH", { watched: true });
-    return { history: Array.from({ length: 60 }, (_, i) => ({ date: new Date(Date.UTC(2026, 7, i + 1)).toISOString().slice(0, 10), close: 1, yield: 0.02 + i / 1000, rolling_yield: 0.02 + i / 1000 })), history_version: 3, history_status: "ready", percentile_start: "2026-08-01", percentile_end: "2026-09-29", history_source: "test", history_updated_at: new Date().toISOString(), history_note: "test" };
+    return { history: Array.from({ length: 60 }, (_, i) => ({ date: new Date(Date.UTC(2026, 7, i + 1)).toISOString().slice(0, 10), close: 1, yield: 0.02 + i / 1000, rolling_yield: 0.02 + i / 1000 })), history_version: 4, history_status: "ready", percentile_start: "2026-08-01", percentile_end: "2026-09-29", history_source: "test", history_updated_at: new Date().toISOString(), history_note: "test" };
   };
   assert.equal((await f.request(`/api/stocks/${saved.id}/history`, "POST", {})).status, 200);
   const before = await (await f.request(`/api/stocks/${saved.id}`)).json();
@@ -194,8 +194,10 @@ test("ETF ready histories survive outages, retain concurrent watch settings and 
   assert.equal(before.quantile_90_price, before.rolling_dividend / before.quantile_90_yield);
   await f.request(`/api/stocks/${saved.id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.9 });
   const custom = await (await f.request(`/api/stocks/${saved.id}`)).json();
-  assert.equal(custom.percentile, before.percentile);
-  assert.equal(custom.quantile_60_price, before.quantile_60_price);
+  assert.notEqual(custom.percentile, before.percentile);
+  assert.equal(custom.percentile, 1);
+  assert.notEqual(custom.quantile_60_price, before.quantile_60_price);
+  assert.equal(custom.quantile_60_price, 1);
   f.source.fetchHistory = async () => { throw new Error("offline"); };
   assert.equal((await f.request(`/api/stocks/${saved.id}/history?refresh=1`, "POST", {})).status, 502);
   assert.deepEqual((await (await f.request(`/api/stocks/${saved.id}`)).json()).history, before.history);
@@ -204,5 +206,27 @@ test("ETF ready histories survive outages, retain concurrent watch settings and 
   const changed = await (await f.request(`/api/stocks/${saved.id}`)).json();
   assert.equal(changed.history.length, 0);
   assert.equal(changed.percentile, null);
-  assert.notEqual(changed.history_version, 3);
+  assert.notEqual(changed.history_version, 4);
+});
+
+test("ETF rolling-only same-day caches upgrade once, then annual and rolling selection reuse both series", async t => {
+  let calls = 0;
+  const now = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10) + "T12:00:00+08:00";
+  const f = await fixture({ fetchHistory: async () => ({ history: Array.from({ length: 90 }, (_, i) => ({ date: new Date(Date.UTC(2026, 6, i + 1)).toISOString().slice(0, 10), close: 1, yield: 0.01 + i / 10000, annual: 0.01, year: 2025, rolling_yield: 0.03 + i / 10000 })), history_version: ++calls === 1 ? 3 : 4, history_status: "ready", percentile_start: "2026-07-01", percentile_end: "2026-09-28", history_updated_at: now, history_source: "test", history_note: "test" }) });
+  t.after(() => f.db.sqlite.close());
+  const saved = await (await f.request("/api/stocks", "POST", { code: "510880", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector: "ETF", price: 1, annual_dividend: 0.015, rolling_dividend: 0.035 })).json();
+  const url = `/api/stocks/${saved.id}`;
+  assert.equal((await f.request(url + "/history", "POST", {})).status, 200);
+  await f.request(url, "PATCH", { yield_basis: "annual" });
+  assert.equal((await (await f.request(url)).json()).percentile, null);
+  const upgraded = await (await f.request(url + "/history", "POST", {})).json();
+  assert.equal(upgraded.history_version, 4);
+  assert.equal(upgraded.quantile_60_price, 0.015 / upgraded.quantile_60_yield);
+  const history = upgraded.history;
+  await f.request(url, "PATCH", { yield_basis: "rolling" });
+  const rolling = await (await f.request(url + "/history", "POST", {})).json();
+  assert.equal(calls, 2);
+  assert.deepEqual(rolling.history, history);
+  assert.notEqual(rolling.quantile_60_yield, upgraded.quantile_60_yield);
+  assert.equal(rolling.quantile_60_price, 0.035 / rolling.quantile_60_yield);
 });

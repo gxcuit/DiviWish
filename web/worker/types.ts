@@ -25,6 +25,12 @@ export interface LegacyEnv {
   APP_PASSWORD?: string;
 }
 
+export type RollingWindowStatus = "overlap" | "gap" | "no_cash" | "before_first";
+export interface HistoryRow {
+  date: string; yield: number; close: number; annual?: number; year?: number; rolling_yield?: number;
+  window_status?: RollingWindowStatus;
+}
+
 export interface StockRecord extends Record<string, unknown> {
   id?: number;
   instrument_type?: "stock" | "etf";
@@ -51,7 +57,7 @@ export interface StockRecord extends Record<string, unknown> {
   source: string;
   verification_note: string | null;
   dividends: Record<string, unknown>[];
-  history: { date: string; yield: number; close: number; rolling_yield?: number }[];
+  history: HistoryRow[];
   connect_factor: number | null;
   grid_start: number;
   grid_end: number;
@@ -106,7 +112,7 @@ export type Bar = { date: string; close: number };
 export type Kline = { bars: Bar[]; adjustment: "qfq" | "none"; quote: Quote | null };
 export type Suggestion = Pick<StockRecord, "name" | "code" | "market" | "instrument_type" | "exchange">;
 export interface HistorySnapshot {
-  history: { date: string; yield: number; close: number; annual?: number; year?: number; rolling_yield?: number }[];
+  history: HistoryRow[];
   history_status?: "ready" | "not_applicable";
   history_version?: number;
   percentile_start: string;

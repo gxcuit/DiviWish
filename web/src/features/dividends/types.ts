@@ -66,6 +66,7 @@ export interface Stock {
   payout_ratio?: number | null;
   payout_note?: string;
   percentile: number | null;
+  percentile_unavailable_reason?: string | null;
   percentile_start: string | null;
   percentile_end: string | null;
   percentile_count: number;
@@ -82,7 +83,7 @@ export interface Stock {
 }
 
 export interface StockDetail extends Stock {
-  percentile_history: { date: string; yield: number; close: number }[];
+  percentile_history: { date: string; yield: number; close: number; window_status?: "overlap" | "gap" | "no_cash" | "before_first" }[];
   yield_grid: { yield: number; price: number | null; reached: boolean | null }[];
   dividends: DividendPart[];
   history: { date: string; yield: number; close: number }[];
