@@ -80,7 +80,7 @@
 
 默认 Wrangler 环境仍使用本地占位 D1。生产命令必须选择 `--env production`；此环境的 `remote: true` 允许开发工具访问远程绑定，因此不要用它运行日常本地开发。`npm run dev` 和 `npm start` 继续使用 `.local/accounts/`。
 
-原单人 D1 `diviwish`（`fcdcdfe4-b286-4e16-b911-8b0e70fe353e`）、本地 SQLite、快照和备份全部保留。新账号初始为空，没有自动导入或分配旧个人数据。
+原单人 D1 `diviwish`（`fcdcdfe4-b286-4e16-b911-8b0e70fe353e`）、本地 SQLite、快照和备份全部保留。新账号仅在创建时加入招商银行（600036）和红利ETF（510880）两个默认标的，行情与分红需刷新后获取；不导入旧个人数据。已有账号不补加标的，删除默认标的后不会再次生成。
 
 自定义域名记录保存在 `env.production.routes`，后续 Wrangler 发布会沿用该绑定。增加新域名时，需要同时更新 Worker 绑定、Turnstile hostname 清单和服务端 `APP_ALLOWED_ORIGINS`。后端还要求 Siteverify 的 hostname 与当前请求域名一致；其他允许域名上的 token 不能拿到本域名使用。两个地址使用同一账号库，但登录 Cookie 分别保存。
 

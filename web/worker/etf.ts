@@ -18,6 +18,13 @@ const rounded = (value: number) => Math.round(value * 1e10) / 1e10;
 export function parseEtfPage(html: string, code: string): EtfPage {
   const title = text(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
   if (!title.includes(`(${code})`) || !title.includes("基金分红送配") || !/ETF/i.test(title)) throw new Error("天天基金证券身份不匹配，须为境内 ETF");
+  // The upstream can serve a different fund's cached fragment inside the
+  // correct page shell. Validate the dividend section's identity as well.
+  const summary = [...html.matchAll(/<label\b[^>]*>([\s\S]*?)<\/label>/gi)].map(row => row[1]).find(row => row.includes("累计分红"));
+  if (summary) {
+    const identity = summary.match(/href=["']https?:\/\/fund\.eastmoney\.com\/(\d{6})\.html["']/i)?.[1];
+    if (identity !== code) throw new Error("天天基金分红片段证券身份不匹配");
+  }
   const tables = [...html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)].map(table =>
     [...table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(row =>
       [...row[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(cell => text(cell[1]))));
@@ -126,8 +133,28 @@ export async function fetchEtfData(stock: StockRecord) {
     load(`https://fundf10.eastmoney.com/fhsp_${stock.code}.html`).then(body => parseEtfPage(body, stock.code)),
     load(`https://finance.sina.com.cn/realstock/company/${symbol}/hfq.js`).then(body => parseSinaActions(body, symbol)),
   ]);
-  if (main.status !== "fulfilled") throw main.reason;
-  return { page: main.value, sina: check.status === "fulfilled" ? check.value : null };
+  const sina = check.status === "fulfilled" ? check.value : null;
+  const today = timestamp().slice(0, 10), cutoff = `${Number(today.slice(0, 4)) - 7}-01-01`;
+  const complete = (page: EtfPage) => {
+    // A fragment missing completed cash events cannot confirm zero income.
+    // Different amounts on an existing date still retain the primary with a warning.
+    const dates = new Set(page.dividends.map(row => row.date));
+    if (sina && [...sina.dividends.keys()].some(day => day >= cutoff && day <= today && !dates.has(day))) {
+      throw new Error("天天基金分红记录不完整，与新浪列示的除息日期不符");
+    }
+    return { page, sina };
+  };
+  try {
+    if (main.status !== "fulfilled") throw main.reason;
+    return complete(main.value);
+  } catch (failure) {
+    // One cache-bypassing retry for transient failures or invalid fragments.
+    // Do not retry HTTP client/rate-limit errors or ever substitute a failure with zero.
+    if (failure instanceof Error && /HTTP 4\d\d/.test(failure.message)) throw failure;
+    const page = await load(`https://fundf10.eastmoney.com/fhsp_${stock.code}.html?verification=${crypto.randomUUID()}`)
+      .then(body => parseEtfPage(body, stock.code));
+    return complete(page);
+  }
 }
 
 export async function fetchEtfDividends(stock: StockRecord): Promise<DividendSnapshot> {
