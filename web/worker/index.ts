@@ -108,7 +108,7 @@ export function createHandler(source: Providers = providers) {
         if (stockMatch[2] === "/history") {
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);
-          if (url.searchParams.get("refresh") !== "1" && stock.history_version === (stock.instrument_type === "etf" ? 3 : 2) && (stock.history.length >= 60 || stock.history_status === "not_applicable") && typeof stock.history_updated_at === "string" && stock.history_updated_at.startsWith(timestamp().slice(0, 10))) {
+          if (url.searchParams.get("refresh") !== "1" && stock.history_version === (stock.instrument_type === "etf" ? 4 : 2) && (stock.history.length >= 60 || stock.history_status === "not_applicable") && typeof stock.history_updated_at === "string" && stock.history_updated_at.startsWith(timestamp().slice(0, 10))) {
             return json(render(stock, await store.stocks(), await store.meta(), true));
           }
           if (!source.fetchHistory) throw new HttpError(503, "历史数据来源尚未配置");
