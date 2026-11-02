@@ -38,11 +38,14 @@ function accountFixture() {
     assert.ok(!(await sent.json()).code);
     return emails.at(-1)!;
   }
-  async function register(email = "alice@example.test", password = PASSWORD) {
+  async function register(email = "alice@example.test", password = PASSWORD, keepDefaults = false) {
     const message = await code(email);
     const response = await request("/api/auth/register", "POST", { ...message, password });
     assert.equal(response.status, 201, await response.clone().text());
-    return { user: (await response.json()).user as User, cookie: response.headers.get("Set-Cookie")!.split(";")[0], response, message };
+    const user = (await response.json()).user as User;
+    // Most account regressions explicitly start after the user clears defaults.
+    if (!keepDefaults) db.sqlite.prepare("DELETE FROM user_stocks WHERE user_id=?").run(user.id);
+    return { user, cookie: response.headers.get("Set-Cookie")!.split(";")[0], response, message };
   }
   return { db, emails, state, env, source, request, code, register, handler };
 }
@@ -60,7 +63,7 @@ test("registration requires a password and email verification; login uses the sa
   assert.equal(user.email, "alice@example.test"); assert.equal(user.hasPassword, true); assert.ok(!("password_hash" in user));
   const cookie = registered.headers.get("Set-Cookie")!.split(";")[0];
   const list = await (await f.request("/api/stocks", "GET", undefined, cookie)).json();
-  assert.deepEqual(list.stocks, []); assert.deepEqual(list.sectors, ["未分类"]);
+  assert.deepEqual(list.stocks.map((s: { code: string }) => s.code), ["600036", "510880"]); assert.deepEqual(list.sectors, ["未分类", "银行", "ETF"]);
   const loggedIn = await f.request("/api/auth/login", "POST", { email: "ALICE@example.test", password: PASSWORD });
   assert.equal(loggedIn.status, 200); assert.equal((await loggedIn.json()).user.id, user.id);
   assert.equal(f.emails.length, 1);
@@ -522,4 +525,51 @@ test("account refresh saves yearly metrics with owner isolation and preserves co
   assert.equal(edited.year_start_price, 50); assert.equal(edited.price, 43.55);
   await f.request(`/api/stocks/${stock.id}`, "PATCH", { annual_dividend: 1 }, alice.cookie);
   assert.equal((await (await f.request(`/api/stocks/${stock.id}`, "GET", undefined, alice.cookie)).json()).payout_ratio, null);
+});
+
+test("new email accounts receive private defaults once; deleting them and signing in keeps the portfolio empty", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register("starter-alice@example.test", PASSWORD, true), bob = await f.register("starter-bob@example.test", PASSWORD, true);
+  const list = await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json();
+  assert.deepEqual(list.stocks.map((s: { code: string }) => s.code), ["600036", "510880"]);
+  assert.deepEqual(list.sectors, ["未分类", "银行", "ETF"]);
+  assert.equal(list.stocks[1].instrument_type, "etf"); assert.equal(list.stocks[1].exchange, "sh");
+  assert.equal(list.stocks[1].yield_basis, "rolling"); assert.equal(list.stocks[1].price, null);
+  const other = await (await f.request("/api/stocks", "GET", undefined, bob.cookie)).json();
+  assert.ok(other.stocks.every((s: { id: number }) => !list.stocks.some((a: { id: number }) => a.id === s.id)));
+  for (const stock of list.stocks) await f.request(`/api/stocks/${stock.id}`, "DELETE", undefined, alice.cookie);
+  const login = await f.request("/api/auth/login", "POST", { email: alice.user.email, password: PASSWORD });
+  assert.equal(login.status, 200); const cookie = login.headers.get("Set-Cookie")!.split(";")[0];
+  assert.deepEqual((await (await f.request("/api/stocks", "GET", undefined, cookie)).json()).stocks, []);
+  assert.equal((await (await f.request("/api/stocks", "GET", undefined, bob.cookie)).json()).stocks.length, 2);
+});
+
+test("existing accounts, including previously emptied ones, only gain the ETF category once", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register();
+  f.db.sqlite.prepare("DELETE FROM user_metadata WHERE user_id=?").run(alice.user.id);
+  f.db.sqlite.prepare("DELETE FROM user_sectors WHERE user_id=? AND name='ETF'").run(alice.user.id);
+  const created = await (await f.request("/api/stocks", "POST", { code: "600036", market: "A", name: "旧记录", sector: "自定义板块", watched: true, price: 12.3 }, alice.cookie)).json();
+  const before = await (await f.request(`/api/stocks/${created.id}`, "GET", undefined, alice.cookie)).json();
+  const list = await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json();
+  assert.equal(list.stocks.length, 1); assert.ok(list.sectors.includes("ETF"));
+  assert.deepEqual(await (await f.request(`/api/stocks/${created.id}`, "GET", undefined, alice.cookie)).json(), before);
+  await f.request(`/api/stocks/${created.id}`, "DELETE", undefined, alice.cookie);
+  assert.deepEqual((await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json()).stocks, []);
+  const sectors = await (await f.request("/api/sectors", "GET", undefined, alice.cookie)).json();
+  const etf = sectors.sectors.find((s: { name: string }) => s.name === "ETF");
+  await f.request(`/api/sectors/${etf.id}`, "DELETE", undefined, alice.cookie);
+  assert.ok(!(await (await f.request("/api/stocks", "GET", undefined, alice.cookie)).json()).sectors.includes("ETF"));
+});
+
+test("new account and its defaults roll back together if a starter insert fails", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  f.db.sqlite.exec("CREATE TRIGGER fail_starter BEFORE INSERT ON user_stocks WHEN NEW.code='510880' BEGIN SELECT RAISE(ABORT,'starter test failure'); END");
+  const message = await f.code("rollback@example.test");
+  const failed = await f.request("/api/auth/register", "POST", { ...message, password: PASSWORD });
+  assert.equal(failed.status, 500);
+  for (const table of ["users", "user_stocks", "user_metadata", "auth_sessions"]) assert.equal(f.db.sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get()!.n, 0);
+  f.db.sqlite.exec("DROP TRIGGER fail_starter"); f.state.now += 61;
+  const success = await f.register("rollback@example.test", PASSWORD, true);
+  assert.equal((await (await f.request("/api/stocks", "GET", undefined, success.cookie)).json()).stocks.length, 2);
 });

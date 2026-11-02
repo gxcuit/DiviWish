@@ -1,3 +1,4 @@
+import { starterPortfolioStatements } from "./onboarding.ts";
 import type { D1Database } from "@cloudflare/workers-types";
 import { bodyJson, HttpError, json, loopback } from "./http.ts";
 import { localDevelopment, sendOtp, type SendOtp } from "./mail.ts";
@@ -221,7 +222,7 @@ export function createAuth({ deliver = sendOtp, fetcher = fetch, clock = () => M
       const session = await sessionStatements(db, userId, passwordHash, now, request);
       const changes = registering ? [
         db.prepare("INSERT INTO users(id,email,created_at,password_hash) VALUES(?,?,?,?) ON CONFLICT(email) DO NOTHING").bind(userId, email, now, passwordHash),
-        db.prepare("INSERT INTO user_sectors(user_id,name) SELECT id,'未分类' FROM users WHERE id=? ON CONFLICT(user_id,name) DO NOTHING").bind(userId),
+        ...starterPortfolioStatements(db, userId),
       ] : [
         db.prepare("UPDATE users SET password_hash=? WHERE id=? AND password_hash IS ?").bind(passwordHash, userId, existing!.password_hash),
         db.prepare("DELETE FROM auth_sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND password_hash=?)").bind(userId, userId, passwordHash),

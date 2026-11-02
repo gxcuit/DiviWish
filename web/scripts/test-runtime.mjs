@@ -48,10 +48,10 @@ try {
   const { id } = await added.json();
   assert.equal((await request(`/api/stocks/${id}`, "GET", undefined, bob)).status, 404);
   assert.equal((await request(`/api/stocks/${id}`, "DELETE", undefined, bob)).status, 404);
-  assert.deepEqual((await (await request("/api/stocks", "GET", undefined, bob)).json()).stocks, []);
+  assert.deepEqual((await (await request("/api/stocks", "GET", undefined, bob)).json()).stocks.map(s => s.code), ["600036", "510880"]);
   // Restart against only this temporary database: sessions and account data persist.
   await service.close(); service = await startLocalServer(options);
-  assert.equal((await (await request("/api/stocks", "GET", undefined, alice)).json()).stocks.length, 1);
+  assert.equal((await (await request("/api/stocks", "GET", undefined, alice)).json()).stocks.length, 3);
   assert.equal((await request("/api/auth/logout", "POST", {}, alice)).status, 200);
   assert.equal((await request("/api/stocks", "GET", undefined, alice)).status, 401);
   const passwordLogin = await request("/api/auth/login", "POST", { email: "alice@example.test", password: "Local runtime test password 123!" });
@@ -71,7 +71,7 @@ try {
   const oauthCookie = callback.headers.getSetCookie().find(value => value.startsWith("diviwish_session=")).split(";")[0];
   const oauthUser = (await (await request("/api/auth/session", "GET", undefined, oauthCookie)).json()).user;
   assert.equal(oauthUser.email, null); assert.equal(oauthUser.linuxdoUsername, "runtime-user");
-  assert.deepEqual((await (await request("/api/stocks", "GET", undefined, oauthCookie)).json()).stocks, []);
+  assert.deepEqual((await (await request("/api/stocks", "GET", undefined, oauthCookie)).json()).stocks.map(s => s.code), ["600036", "510880"]);
   console.log("Local HTTP runtime passed: LinuxDO OAuth callback/cookies and static login page, registration, sessions, account isolation, restart persistence, CSRF and logout. No real emails or personal databases used.");
 } finally {
   if (service) await service.close();

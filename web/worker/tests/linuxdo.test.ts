@@ -69,13 +69,16 @@ test("LinuxDO creates a private account without a mailbox/password, rotates sess
   assert.match(first.response.headers.getSetCookie().join(";"), /HttpOnly; SameSite=Lax/);
   assert.match(first.response.headers.getSetCookie().join(";"), /; Secure/);
   f.db.sqlite.prepare("INSERT INTO user_metadata(user_id,key,value) VALUES(?,'test',?)").run(first.user.id, JSON.stringify("saved"));
+  const defaults = await (await f.request("/api/stocks", first.cookie)).json();
+  assert.deepEqual(defaults.stocks.map((s: { code: string }) => s.code), ["600036", "510880"]);
+  for (const stock of defaults.stocks) await f.request(`/api/stocks/${stock.id}`, first.cookie, "DELETE");
   const added = await f.request("/api/stocks", first.cookie, "POST", {}, { code: "600036", market: "A", name: "保留股票", sector: "银行", price: 10 });
   assert.equal(added.status, 201, await added.clone().text()); const stockId = (await added.json()).id;
   f.state.profile.username = "renamed";
   const again = await f.login(first.cookie);
   assert.equal((await f.request("/api/stocks", first.cookie)).status, 401); assert.equal(again.user.id, first.user.id); assert.equal(again.user.linuxdoUsername, "renamed");
   assert.equal(f.db.sqlite.prepare("SELECT count(*) AS n FROM users").get()!.n, 1);
-  assert.equal(f.db.sqlite.prepare("SELECT value FROM user_metadata WHERE user_id=?").get(first.user.id)!.value, '"saved"');
+  assert.equal(f.db.sqlite.prepare("SELECT value FROM user_metadata WHERE user_id=? AND key='test'").get(first.user.id)!.value, '"saved"');
   assert.equal((await (await f.request("/api/stocks", again.cookie)).json()).stocks[0].id, stockId);
   f.state.profile.id = 43; const other = await f.login();
   assert.equal((await f.request(`/api/stocks/${stockId}`, other.cookie)).status, 404);
@@ -179,4 +182,15 @@ test("provider redirects are rejected at both credential-bearing endpoints witho
     assert.ok(!response.headers.getSetCookie().some(value => value.startsWith("diviwish_session=")));
   }
   assert.equal(f.db.sqlite.prepare("SELECT count(*) AS n FROM users").get()!.n, 0);
+});
+
+test("LinuxDO users who remove defaults keep an empty portfolio on later logins", async t => {
+  const f = fixture(); t.after(() => f.db.sqlite.close());
+  const first = await f.login();
+  const stocks = await (await f.request("/api/stocks", first.cookie)).json();
+  assert.deepEqual(stocks.stocks.map((s: { code: string }) => s.code), ["600036", "510880"]);
+  for (const stock of stocks.stocks) await f.request(`/api/stocks/${stock.id}`, first.cookie, "DELETE");
+  const again = await f.login(first.cookie);
+  assert.equal(again.user.id, first.user.id);
+  assert.deepEqual((await (await f.request("/api/stocks", again.cookie)).json()).stocks, []);
 });

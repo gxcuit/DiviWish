@@ -1,3 +1,4 @@
+import { ensureEtfSector } from "./onboarding.ts";
 import { createLinuxdoAuth } from "./linuxdo.ts";
 import { createAuth, requireUser } from "./auth.ts";
 import { BollingerService } from "./bollinger.ts";
@@ -28,6 +29,7 @@ export function createHandler(source: Providers = providers, authOptions: Parame
       const authResponse = await auth(request, env);
       if (authResponse) return authResponse;
       const user = await requireUser(request, env), db = env.DB, store = portfolio(db, user.id);
+      if (method === "GET" && ["/api/stocks", "/api/sectors"].includes(path)) await ensureEtfSector(db, user.id);
       if (path === "/api/stocks/preview" && method === "GET") {
         const stock = validated(() => validate({ code: url.searchParams.get("code"), market: url.searchParams.get("market"), instrument_type: url.searchParams.get("instrument_type") ?? "stock", exchange: url.searchParams.get("exchange"), name: "待查询股票", sector: "未分类" }));
         stock.id = 0; // Temporary quote identity; preview never writes to the portfolio.

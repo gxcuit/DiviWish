@@ -1,3 +1,4 @@
+import { starterPortfolioStatements } from "./onboarding.ts";
 import { currentUser, digest, rateLimit, sessionCookie, sessionToken, signedDigest, token } from "./auth.ts";
 import { HttpError, json, loopback } from "./http.ts";
 import type { Env } from "./types.ts";
@@ -111,7 +112,7 @@ export function createLinuxdoAuth({ fetcher = fetch, clock = () => Math.floor(Da
         db.prepare("INSERT INTO users(id,email,created_at,linuxdo_id,linuxdo_username) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING")
           .bind(userId, `linuxdo:${subject}`, now, subject, profile.username),
         db.prepare("UPDATE users SET linuxdo_username=? WHERE linuxdo_id=?").bind(profile.username, subject),
-        db.prepare("INSERT INTO user_sectors(user_id,name) SELECT id,'未分类' FROM users WHERE linuxdo_id=? ON CONFLICT(user_id,name) DO NOTHING").bind(subject),
+        ...(!existing ? starterPortfolioStatements(db, userId) : []),
       ]);
       const value = token();
       await db.batch([
