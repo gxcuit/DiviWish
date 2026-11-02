@@ -137,7 +137,7 @@ export function createHandler(source: Providers = providers) {
         if (await store.save(updated, stock) === null) throw new HttpError(409, "股票已变更，请刷新后重试");
         return json(render((await store.stock(id))!, await store.stocks(), await store.meta()));
       }
-      if (path === "/api/refresh" && method === "POST") { await bodyJson(request); return await refreshStocks(db, await store.stocks(), source); }
+      if (path === "/api/refresh" && method === "POST") { await bodyJson(request); return await refreshStocks(db, await store.stocks(), source, true); }
       throw new HttpError(404, "接口不存在");
     } catch (error) {
       if (error instanceof HttpError) return json({ error: error.message }, error.status, error.status === 429 ? { "Retry-After": "60" } : {});

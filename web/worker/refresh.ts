@@ -1,6 +1,7 @@
 import type { SqliteDatabase, SqliteStatement } from "./types.ts";
 import { readRow } from "./database.ts";
 import { HttpError, json } from "./http.ts";
+import { portfolio } from "./portfolio.ts";
 import { timestamp } from "./validation.ts";
 import type { DividendSnapshot, Providers, StockRecord, StockRow } from "./types.ts";
 
@@ -12,10 +13,11 @@ const unchanged = (before: StockRecord, after: StockRecord, keys: string[]) =>
 
 async function dividendSnapshots(records: StockRecord[], source: Providers, errors: string[]) {
   const snapshots = new Map<number, DividendSnapshot>(), deadline = Date.now() + 40_000;
+  let lastAttempted: number | null = null;
   // Bound parallel upstream requests and finish within the browser's request timeout.
   for (let offset = 0; offset < records.length; offset += 4) {
     if (Date.now() >= deadline) {
-      errors.push(`其余 ${records.length - offset} 支股票的股息尚未查询，请再次刷新`);
+      errors.push(`其余 ${records.length - offset} 支股票的股息尚未查询，再次刷新将优先继续未完成的查询`);
       break;
     }
     await Promise.all(records.slice(offset, offset + 4).map(async stock => {
@@ -24,17 +26,23 @@ async function dividendSnapshots(records: StockRecord[], source: Providers, erro
         snapshots.set(stock.id!, await source.fetchDividends(stock));
       } catch { errors.push(`${stock.code}：${stock.instrument_type === "etf" ? "ETF 分红获取失败" : "未获取到可核实的完整年度股息"}，保留原股息与明细`); }
     }));
+    lastAttempted = records[Math.min(offset + 4, records.length) - 1].id!;
   }
-  return snapshots;
+  return { snapshots, lastAttempted };
 }
 
 /** Refresh the single local portfolio without overwriting concurrent edits. */
-export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], source: Providers) {
+export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], source: Providers, resumeDividends = false) {
   if (!records.length) throw new HttpError(400, "请先添加股票");
+  const store = portfolio(db);
+  const cursor = resumeDividends ? (await store.meta()).dividend_refresh_cursor : null;
+  const ordered = [...records].sort((first, second) => first.id! - second.id!);
+  const start = typeof cursor === "number" ? Math.max(0, ordered.findIndex(stock => stock.id! > cursor)) : 0;
+  const pending = [...ordered.slice(start), ...ordered.slice(0, start)];
   const errors: string[] = [];
-  const [quoteResult, dividends, fxResult] = await Promise.all([
+  const [quoteResult, { snapshots: dividends, lastAttempted }, fxResult] = await Promise.all([
     source.fetchQuotes(records).catch(() => ({ quotes: new Map(), errors: ["腾讯行情请求失败，保留旧报价"] })),
-    dividendSnapshots(records, source, errors),
+    dividendSnapshots(pending, source, errors),
     records.some(stock => stock.market === "HK") ? source.fetchFx().catch(() => null) : Promise.resolve(null),
   ]);
   errors.push(...quoteResult.errors);
@@ -71,12 +79,18 @@ export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], 
       "WHERE id=? AND code=? AND market=? AND document=?")
       .bind(JSON.stringify(patch), stock.id!, stock.code, stock.market, row.document) });
   }
-  if (!changes.length) return json({ message: "刷新未更新任何数据，原值保持不变", updated: 0, quotes_updated: 0, dividends_updated: 0, errors }, 502);
+  // Advance even on upstream failures; one bad batch must not starve later stocks.
+  // Single-stock refreshes never change the full-portfolio continuation point.
+  const progress = resumeDividends && lastAttempted !== null ? [store.setMeta("dividend_refresh_cursor", lastAttempted)] : [];
+  if (!changes.length) {
+    if (progress.length) await db.batch(progress);
+    return json({ message: "刷新未更新任何数据，原值保持不变", updated: 0, quotes_updated: 0, dividends_updated: 0, errors }, 502);
+  }
   const matched = "FROM stocks WHERE json_extract(document,'$._refresh_id')=?";
   const setMeta = (key: string, value: unknown, filter = "") => db.prepare("INSERT INTO metadata(key,value) " +
     `SELECT ?,? WHERE EXISTS(SELECT 1 ${matched}${filter}) ON CONFLICT(key) DO UPDATE SET value=excluded.value`)
     .bind(key, JSON.stringify(value), marker);
-  const metadata = [setMeta("last_refresh", now)];
+  const metadata = [...progress, setMeta("last_refresh", now)];
   if (fx !== null) metadata.push(setMeta("fx_rate", fx, " AND market='HK'"));
   const quotedIds = JSON.stringify(changes.filter(change => change.applyQuote).map(change => change.stock.id));
   metadata.push(db.prepare("INSERT INTO metadata(key,value) " +
