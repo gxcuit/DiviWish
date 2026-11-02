@@ -37,7 +37,7 @@ export function YieldBasisPicker({ stock, onSave }: {
         </select></label>
         {basis === "custom" && <label>自定义股息率（%）<input type="number" min="0" max="100" step="any" required value={custom} placeholder="如：6" onChange={event => setCustom(event.target.value)} /></label>}
       </div>
-      <p className={styles.hint}>{etf ? "保存后用于 ETF 列表、目标价格、网格、历史曲线和分位。年度按各历史日上一完整自然年派息计算，滚动按此前12个月计算；自定义为估算回溯。" : basis === "custom" ? "直接输入估算百分比。对应价格 = 当前价格 × 自定义股息率 ÷ 目标股息率；历史分位也按该估算每股股息回溯，报价变化后会重新折算。" : "保存后用于列表股息率、目标价格、个股网格和历史分位。年度和滚动年度的原始指标仍分别保留。"}</p>
+      <p className={styles.hint}>{etf ? "保存后用于 ETF 列表、目标价格、网格和历史分位。年度按各历史日上一完整自然年派息计算，滚动按此前12个月计算；自定义为估算回溯。" : basis === "custom" ? "直接输入估算百分比。对应价格 = 当前价格 × 自定义股息率 ÷ 目标股息率；历史分位也按该估算每股股息回溯，报价变化后会重新折算。" : "保存后用于列表股息率、目标价格、个股网格和历史分位。年度和滚动年度的原始指标仍分别保留。"}</p>
       <div className={styles.saveRow}><small>当前使用：{etf ? stock.yield_basis === "annual" ? "上一自然年派息率" : stock.yield_basis === "rolling" ? "滚动12个月派息率" : "自定义估算派息率" : yieldLabels[stock.yield_basis || "annual"]} · {stock.selected_yield == null ? "—" : `${(stock.selected_yield * 100).toFixed(2)}%`}</small><button className={styles.primary} disabled={saving}>{saving ? "保存中…" : "保存股息率选择"}</button></div>
       {stock.selected_yield === null && <p className={styles.hint}>所选口径数据暂不可用，不使用其他口径代替。</p>}
       {message && <p className={styles.success} role="status">{message}</p>}
