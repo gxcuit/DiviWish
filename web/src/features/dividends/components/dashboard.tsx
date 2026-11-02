@@ -12,6 +12,7 @@ import { YieldBasisPicker, yieldLabels } from "./yield-basis-picker";
 import { SectorManager } from "./sector-manager";
 import { StockBoll } from "./stock-boll";
 import { BollProvider } from "./boll-provider";
+import { inferSecurityCode, resolveSecurityQuery, type SecurityIdentity } from "../security-identity";
 import { EtfDividendDetails } from "./etf-dividend-details";
 import { BollLegend, StockBollTags } from "./stock-boll-tags";
 
@@ -75,24 +76,22 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
   const previewRequest = useRef<AbortController | null>(null);
   const [name, setName] = useState(stock?.name || "");
   const [code, setCode] = useState(stock?.code || "");
+  const selectedName = useRef(stock?.name || "");
   const [market, setMarket] = useState<"A" | "HK">(stock?.market || "A");
   const [instrumentType, setInstrumentType] = useState(stock?.instrument_type || "stock");
-  const [exchange, setExchange] = useState(stock?.exchange || "sh");
+  const [exchange, setExchange] = useState(stock?.exchange || inferSecurityCode(stock?.code || "")?.exchange || "sh");
   const [sector, setSector] = useState(stock?.sector || sectors[0] || "其他");
   const formReference = useRef<HTMLFormElement>(null);
   useEffect(() => () => previewRequest.current?.abort(), []);
 
   async function fetchStockData() {
     if (fetching || saving) return;
-    if (!(market === "A" ? /^[0-9]{6}$/ : /^[0-9]{5}$/).test(code)) {
-      setError(`请先填写 ${market === "A" ? "6 位 A 股" : "5 位港股"}股票代码`);
-      return;
-    }
     const controller = new AbortController();
     previewRequest.current = controller;
     setFetching(true); setError(""); setPreviewNotice("");
     try {
-      const result = await api<StockPreview>(`/stocks/preview?${new URLSearchParams({ market, code, instrument_type: instrumentType, ...(instrumentType === "etf" ? { exchange } : {}) })}`, { signal: controller.signal });
+      const identity = await identify(controller.signal);
+      const result = await api<StockPreview>(`/stocks/preview?${new URLSearchParams({ market: identity.market, code: identity.code, instrument_type: identity.instrument_type || "stock", ...(identity.instrument_type === "etf" ? { exchange: identity.exchange! } : {}) })}`, { signal: controller.signal });
       if (controller.signal.aborted) return;
       const fill = (field: string, value: number | string | null) => {
         const input = formReference.current?.elements.namedItem(field);
@@ -106,10 +105,10 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
       if (result.dividends) {
         fill("annual_dividend", result.dividends.annual_dividend);
         fill("ex_dividend_date", result.dividends.ex_dividend_date);
-        if (instrumentType === "etf") fill("rolling_dividend", result.dividends.rolling_dividend ?? null);
+        if (identity.instrument_type === "etf") fill("rolling_dividend", result.dividends.rolling_dividend ?? null);
         const confirmed = formReference.current?.elements.namedItem("confirmed");
         if (confirmed instanceof HTMLInputElement) confirmed.checked = result.dividends.confirmed;
-        notices.push(`${result.dividends.annual_year} 年度${instrumentType === "etf" ? "每份分红及滚动分红" : "每股股息"}已填入（人民币）${result.dividends.dividend_note ? "；" + result.dividends.dividend_note : ""}`);
+        notices.push(`${result.dividends.annual_year} 年度${identity.instrument_type === "etf" ? "每份分红及滚动分红" : "每股股息"}已填入（人民币）${result.dividends.dividend_note ? "；" + result.dividends.dividend_note : ""}`);
       }
       setPreviewNotice([...notices, ...result.errors, "核对后点击保存标的，可继续手动修改。"].join("；"));
     } catch (failure) {
@@ -117,7 +116,8 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
     } finally { if (!controller.signal.aborted) setFetching(false); }
   }
 
-  function selectStock(suggestion: StockSuggestion) {
+  function selectStock(suggestion: SecurityIdentity) {
+    selectedName.current = suggestion.name;
     if (code && (code !== suggestion.code || market !== suggestion.market || instrumentType !== (suggestion.instrument_type || "stock"))) {
       for (const field of ["price", "annual_dividend", "rolling_dividend", "target_yield", "ex_dividend_date"]) {
         const input = formReference.current?.elements.namedItem(field);
@@ -130,11 +130,42 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
     setCode(suggestion.code);
     setMarket(suggestion.market);
     setInstrumentType(suggestion.instrument_type || "stock");
-    setExchange(suggestion.exchange || "sh");
+    setExchange(suggestion.exchange || inferSecurityCode(suggestion.code)?.exchange || "sh");
     if (suggestion.sector) {
       setSector(suggestion.sector);
     }
   }
+  function changeQuery(value: string) {
+    if (code && value.trim() !== selectedName.current) {
+      for (const field of ["price", "annual_dividend", "rolling_dividend", "ex_dividend_date"]) {
+        const input = formReference.current?.elements.namedItem(field);
+        if (input instanceof HTMLInputElement) input.value = "";
+      }
+      const confirmed = formReference.current?.elements.namedItem("confirmed");
+      if (confirmed instanceof HTMLInputElement) confirmed.checked = false;
+    }
+    setName(value); selectedName.current = ""; setPreviewNotice(""); setError("");
+    const identity = inferSecurityCode(value);
+    // Clear prices and distributions only after a new identity can be identified.
+    if (identity) {
+      selectStock({ ...identity, name: value });
+      selectedName.current = ""; // Still resolve the official name on fetch/save.
+    } else { setCode(""); }
+  }
+
+  async function identify(signal?: AbortSignal): Promise<SecurityIdentity> {
+    if (code && selectedName.current === name.trim()) return { name: selectedName.current, code, market, instrument_type: instrumentType, exchange };
+    const query = name.trim();
+    if (!query) throw new Error("请输入名称或代码");
+    let suggestions: StockSuggestion[] = [];
+    try { suggestions = (await api<{ suggestions: StockSuggestion[] }>(`/stocks/search?q=${encodeURIComponent(query)}`, { signal })).suggestions; }
+    catch (failure) { if (signal?.aborted) throw failure; }
+    const identity = resolveSecurityQuery(query, suggestions);
+    if (!identity) throw new Error("请从搜索结果中选择具体标的，或输入完整的 6 位境内代码／5 位港股代码");
+    selectStock(identity);
+    return identity;
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving || fetching) return;
@@ -142,7 +173,8 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
     setSaving(true);
     setError("");
     try {
-      await onSave({ instrument_type: instrumentType, exchange: instrumentType === "etf" ? exchange : null, ...(instrumentType === "etf" ? { rolling_dividend: form.get("rolling_dividend") === "" ? null : Number(form.get("rolling_dividend")) } : {}), name: form.get("name"), code: form.get("code"), market, sector: form.get("sector"), price: form.get("price") === "" ? null : Number(form.get("price")), annual_dividend: form.get("annual_dividend") === "" ? null : Number(form.get("annual_dividend")), target_yield: form.get("target_yield") === "" ? null : Number(form.get("target_yield")) / 100, confirmed: form.get("confirmed") === "on", ex_dividend_date: form.get("ex_dividend_date") || null });
+      const identity = await identify();
+      await onSave({ instrument_type: identity.instrument_type || "stock", exchange: identity.instrument_type === "etf" ? identity.exchange : null, ...(identity.instrument_type === "etf" ? { rolling_dividend: !form.get("rolling_dividend") ? null : Number(form.get("rolling_dividend")) } : {}), name: identity.name, code: identity.code, market: identity.market, sector: form.get("sector"), price: form.get("price") === "" ? null : Number(form.get("price")), annual_dividend: form.get("annual_dividend") === "" ? null : Number(form.get("annual_dividend")), target_yield: form.get("target_yield") === "" ? null : Number(form.get("target_yield")) / 100, confirmed: form.get("confirmed") === "on", ex_dividend_date: form.get("ex_dividend_date") || null });
       onClose();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "保存失败"); }
     finally { setSaving(false); }
@@ -150,10 +182,8 @@ function StockForm({ stock, sectors, onSave, onClose }: { stock: Stock | null; s
   return <Modal title={stock ? "编辑标的" : "添加标的"} onClose={onClose}>
     <form ref={formReference} className={styles.form} onSubmit={submit}>
       <fieldset className={styles.formFields} disabled={fetching || saving}>
-      <label>证券类型<select aria-label="证券类型" value={instrumentType} onChange={event => { setInstrumentType(event.target.value as "stock" | "etf"); setMarket("A"); setPreviewNotice(""); }}><option value="stock">股票</option><option value="etf">境内 ETF</option></select></label>
-      {instrumentType === "etf" && <label>交易所<select aria-label="交易所" value={exchange} onChange={event => { setExchange(event.target.value as "sh" | "sz"); setPreviewNotice(""); }}><option value="sh">上海证券交易所</option><option value="sz">深圳证券交易所</option></select></label>}
-      <StockAutocomplete value={name} onChange={setName} onSelect={suggestion => { setPreviewNotice(""); selectStock(suggestion); }} />
-      <div className={styles.formColumns}><label>市场<select name="market" value={market} disabled={instrumentType === "etf"} onChange={event => { setMarket(event.target.value as "A" | "HK"); setPreviewNotice(""); }}><option value="A">A 股 · 人民币</option><option value="HK">港股 · 港币</option></select></label><label>证券代码<input name="code" required pattern="[0-9]{5,6}" maxLength={6} value={code} onChange={event => { setCode(event.target.value); setPreviewNotice(""); }} placeholder="6 位 A 股 / 5 位港股" /></label></div>
+      <StockAutocomplete value={name} onChange={changeQuery} onSelect={suggestion => { setPreviewNotice(""); setError(""); selectStock(suggestion); }} />
+      <p className={styles.muted} role="status">{code ? `已识别：${instrumentType === "etf" ? "ETF" : market === "HK" ? "港股" : "A股"} · ${code} · ${exchange === "sz" ? "深圳证券交易所" : exchange === "bj" ? "北京证券交易所" : market === "HK" ? "香港交易所" : "上海证券交易所"}` : "输入名称或代码，自动识别市场、证券类型和交易所。"}</p>
       <SectorPicker value={sector} options={sectors} onChange={setSector} />
       <button type="button" className={styles.fetchButton} onClick={fetchStockData}><RefreshCw size={16} className={fetching ? styles.spinning : undefined} />{fetching ? "正在获取价格与股息…" : "获取当前价格与股息"}</button>
       {previewNotice && <p className={styles.previewNotice} role="status">{previewNotice}</p>}

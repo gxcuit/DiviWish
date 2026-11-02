@@ -50,7 +50,7 @@ export function StockAutocomplete({ value, onChange, onSelect }: {
         if (!response.ok) throw new Error(data.error || "搜索暂不可用");
         if (current) setResult({ query, suggestions: data.suggestions, message: data.message, loading: false });
       } catch {
-        if (current) setResult({ query, suggestions: [], message: "股票搜索暂不可用，可继续手动填写。", loading: false });
+        if (current) setResult({ query, suggestions: [], message: "联网搜索暂不可用，可输入完整代码继续。", loading: false });
       }
     }, 300);
     return () => { current = false; window.clearTimeout(timer); controller.abort(); };
@@ -73,8 +73,9 @@ export function StockAutocomplete({ value, onChange, onSelect }: {
       setFocused(true);
       if (suggestions.length) setActiveIndex(index => event.key === "ArrowDown" ? (index + 1) % suggestions.length : index <= 0 ? suggestions.length - 1 : index - 1);
     } else if (event.key === "Enter" && open) {
-      event.preventDefault();
-      if (activeSuggestion) choose(activeSuggestion);
+      const match = activeSuggestion || (suggestions.length === 1 ? suggestions[0] : undefined);
+      if (match) { event.preventDefault(); choose(match); }
+      else setFocused(false);
     } else if (event.key === "Escape" && open) {
       event.preventDefault();
       event.stopPropagation();
@@ -102,7 +103,7 @@ export function StockAutocomplete({ value, onChange, onSelect }: {
           <span className={styles.identity}><b>{suggestion.code}</b><small>{suggestion.instrument_type === "etf" ? "ETF" : suggestion.market === "HK" ? "港股" : "A股"}</small></span>
         </button>)}
       </div>
-      <p role="status" className={styles.hint}>{loading ? "正在搜索…" : result.message || (suggestions.length ? "选择股票自动填写 · ↑↓ 选择，Enter 确认" : "未找到匹配标的，可继续手动填写。")}</p>
+      <p role="status" className={styles.hint}>{loading ? "正在搜索…" : result.message || (suggestions.length ? "匹配信息自动填写 · ↑↓ 选择，Enter 确认" : "未找到匹配标的，请尝试完整代码。")}</p>
     </div>}
   </div>;
 }
