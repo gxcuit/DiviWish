@@ -2,14 +2,14 @@ import { GRID_DEFAULTS, YIELD_DEFAULTS, gridLevels, number } from "./calculation
 import type { StockRecord } from "./types.ts";
 
 export const DEFAULT_STOCK = {
-  ...GRID_DEFAULTS, ...YIELD_DEFAULTS,
+  ...GRID_DEFAULTS, ...YIELD_DEFAULTS, instrument_type: "stock" as const, exchange: null,
   price: null, change_pct: null, annual_dividend: null, rolling_dividend: null,
   target_yield: null, confirmed: false, ex_dividend_date: null, quote_date: null,
   updated_at: null, annual_year: null, year_start_price: null, percentile_start: null,
   percentile_end: null, a_code: null, source: "手动录入", verification_note: null,
   dividends: [], history: [], connect_factor: null,
 };
-const EDITABLE = new Set(["code", "name", "sector", "market", "price", "annual_dividend", "rolling_dividend", "target_yield",
+const EDITABLE = new Set(["instrument_type", "exchange", "code", "name", "sector", "market", "price", "annual_dividend", "rolling_dividend", "target_yield",
   "confirmed", "ex_dividend_date", "watched", "a_code", "year_start_price", ...Object.keys(GRID_DEFAULTS), ...Object.keys(YIELD_DEFAULTS)]);
 
 export function timestamp(): string {
@@ -41,6 +41,13 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     stock[field] = value.trim();
   }
   stock.sector = sectorName(stock.sector);
+  if (!["stock", "etf"].includes(stock.instrument_type ?? "")) throw new Error("证券类型只能为股票或 ETF");
+  if (stock.exchange !== null && !["sh", "sz", "bj", "hk"].includes(stock.exchange ?? "")) throw new Error("交易所无效");
+  if (stock.instrument_type === "etf") {
+    if (stock.market !== "A" || !["sh", "sz"].includes(stock.exchange ?? "") || !(stock.exchange === "sh" ? /^(51|52|56|58)\d{4}$/ : /^159\d{3}$/).test(stock.code)) throw new Error("请选择沪深 ETF 及对应交易所和代码");
+    if (!("yield_basis" in input) && (!existing || existing.instrument_type !== "etf")) stock.yield_basis = "rolling";
+    stock.a_code = null;
+  }
   gridLevels(stock);
   if (!["annual", "rolling", "custom"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度或自定义");
   if (stock.custom_yield !== null) {
@@ -66,20 +73,27 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
   if (stock.ex_dividend_date !== null && dateString(stock.ex_dividend_date) !== stock.ex_dividend_date) throw new Error("除息日格式须为 YYYY-MM-DD");
   if (stock.a_code !== null && (typeof stock.a_code !== "string" || !/^[0-9]{6}$/.test(stock.a_code))) throw new Error("对应 A 股代码需要 6 位数字");
   const changed = (fields: string[]) => existing && fields.some(field => field in input && input[field] !== existing[field]);
-  if (changed(["rolling_dividend"])) stock.dividend_hkd_rolling = 0;
-  if (changed(["annual_dividend", "code", "market"])) {
+  if (changed(["rolling_dividend"])) {
+    stock.dividend_hkd_rolling = 0;
+    if (stock.instrument_type === "etf") {
+      delete stock.dividend_verification;
+      stock.dividend_note = "滚动每份分红已人工维护，请自行核实；逐次明细保留上次查询结果。";
+    }
+  }
+  if (changed(["annual_dividend", "code", "market", "instrument_type", "exchange"])) {
     for (const field of ["history_source", "history_updated_at", "history_note"]) delete stock[field];
     for (const field of ["dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"]) delete stock[field];
     Object.assign(stock, { dividends: [], history: [], percentile_start: null, percentile_end: null, annual_year: null,
       source: "手动编辑（分红或证券身份已变更，历史对比已清除）", verification_note: "手动分红需自行核实；相关历史对比已清除。" });
+    for (const field of ["next_ex_dividend_date", "dividend_calendar_dates", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start"]) delete stock[field];
     if (!("rolling_dividend" in input)) stock.rolling_dividend = null;
     if (!("confirmed" in input)) stock.confirmed = false;
-    if (changed(["code", "market"])) {
+    if (changed(["code", "market", "instrument_type", "exchange"])) {
       for (const field of ["price", "annual_dividend", "ex_dividend_date", "year_start_price", "a_code"] as const) {
         if (!(field in input)) stock[field] = null;
       }
       Object.assign(stock, { quote_date: null, change_pct: null, year_start_year: null, year_start_date: null, year_start_adjustment: null });
-      if (!("yield_basis" in input)) Object.assign(stock, YIELD_DEFAULTS);
+      if (!("yield_basis" in input)) Object.assign(stock, YIELD_DEFAULTS, stock.instrument_type === "etf" ? { yield_basis: "rolling" } : {});
     }
   }
   if ("year_start_price" in input) Object.assign(stock, { year_start_year: null, year_start_date: null, year_start_adjustment: null });

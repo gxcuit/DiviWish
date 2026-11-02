@@ -23,7 +23,7 @@ export function createHandler(source: Providers = providers) {
         return json({ status: "ok", database: "sqlite", mode: "standalone", count: row?.count ?? 0 });
       }
       if (path === "/api/stocks/preview" && method === "GET") {
-        const stock = validated(() => validate({ code: url.searchParams.get("code"), market: url.searchParams.get("market"), name: "待查询股票", sector: "未分类" }));
+        const stock = validated(() => validate({ code: url.searchParams.get("code"), market: url.searchParams.get("market"), instrument_type: url.searchParams.get("instrument_type") ?? "stock", exchange: url.searchParams.get("exchange"), name: "待查询股票", sector: "未分类" }));
         stock.id = 0; // Temporary quote identity; preview never writes to the portfolio.
         const [quotes, dividends] = await Promise.allSettled([
           source.fetchQuotes([stock]),
@@ -35,7 +35,7 @@ export function createHandler(source: Providers = providers) {
           ...(!quote ? ["当前价格获取失败，原值未修改，可稍后重试或手动填写"] : []),
           ...(!snapshot ? ["未获取到可核实的完整年度股息，原值未修改，请核实后手动填写"] : []),
         ];
-        return json({ code: stock.code, market: stock.market, quote, dividends: snapshot, errors }, quote || snapshot ? 200 : 502);
+        return json({ code: stock.code, market: stock.market, instrument_type: stock.instrument_type, exchange: stock.exchange, quote, dividends: snapshot, errors }, quote || snapshot ? 200 : 502);
       }
       if (path === "/api/stocks" && method === "GET") {
         const [records, meta, sectors] = await Promise.all([store.stocks(), store.meta(), store.sectors()]);
@@ -106,6 +106,7 @@ export function createHandler(source: Providers = providers) {
         const id = Number(stockMatch[1]), stock = await store.stock(id);
         if (!stock) throw new HttpError(404, "股票不存在");
         if (stockMatch[2] === "/history") {
+          if (stock.instrument_type === "etf") throw new HttpError(400, "ETF 历史派息率分位暂不支持");
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);
           if (stock.history_version === 2 && stock.history.length >= 60 && typeof stock.history_updated_at === "string" && stock.history_updated_at.startsWith(timestamp().slice(0, 10))) {
@@ -116,7 +117,7 @@ export function createHandler(source: Providers = providers) {
           try { snapshot = await source.fetchHistory(stock); }
           catch (error) { throw new HttpError(502, `历史分位获取失败：${error instanceof Error ? error.message : "历史数据来源暂不可用"}。已保留原有历史数据。`); }
           const current = await store.stock(id);
-          const relevant = ["code", "market", "annual_dividend", "history", "history_updated_at"];
+          const relevant = ["code", "market", "instrument_type", "exchange", "annual_dividend", "history", "history_updated_at"];
           if (!current || relevant.some(key => JSON.stringify(current[key]) !== JSON.stringify(stock[key]))) throw new HttpError(409, "股票数据已变更，跳过旧历史计算，请重试");
           if (await store.save({ ...current, ...snapshot }, current) === null) throw new HttpError(409, "股票数据已变更，请重试");
           return json(render((await store.stock(id))!, await store.stocks(), await store.meta(), true));

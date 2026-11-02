@@ -4,6 +4,8 @@ import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import styles from "./stock-autocomplete.module.css";
 
 export interface StockSuggestion {
+  instrument_type?: "stock" | "etf";
+  exchange?: "sh" | "sz" | "bj" | "hk" | null;
   name: string;
   code: string;
   market: "A" | "HK";
@@ -83,24 +85,24 @@ export function StockAutocomplete({ value, onChange, onSelect }: {
   return <div className={styles.root} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
   }}>
-    <label htmlFor={inputId}>股票名称</label>
+    <label htmlFor={inputId}>名称或代码</label>
     <input id={inputId} name="name" role="combobox" aria-autocomplete="list" aria-expanded={open}
       aria-controls={listId} aria-activedescendant={open && activeSuggestion ? `${listId}-${activeIndex}` : undefined}
-      required maxLength={40} autoComplete="off" value={value} placeholder="输入名称或代码，如：中国神华"
+      required maxLength={40} autoComplete="off" value={value} placeholder="输入名称或代码，如：中国神华、510880"
       onFocus={() => setFocused(true)} onClick={() => { setFocused(true); setActiveIndex(-1); }}
       onChange={event => { onChange(event.target.value); setFocused(true); setActiveIndex(-1); }}
       onCompositionStart={() => setComposing(true)} onCompositionEnd={() => setComposing(false)} onKeyDown={handleKey} />
     {open && <div className={styles.dropdown}>
-      <div id={listId} role="listbox" aria-label="匹配股票" aria-busy={loading} className={styles.list}>
+      <div id={listId} role="listbox" aria-label="匹配标的" aria-busy={loading} className={styles.list}>
         {suggestions.map((suggestion, index) => <button key={`${suggestion.market}-${suggestion.code}`}
           id={`${listId}-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex}
           className={`${styles.option} ${index === activeIndex ? styles.active : ""}`}
           onMouseDown={event => event.preventDefault()} onMouseMove={() => setActiveIndex(index)} onClick={() => choose(suggestion)}>
           <span><strong>{suggestion.name}</strong>{suggestion.existing && <small>已在列表</small>}</span>
-          <span className={styles.identity}><b>{suggestion.code}</b><small>{suggestion.market === "HK" ? "港股" : "A股"}</small></span>
+          <span className={styles.identity}><b>{suggestion.code}</b><small>{suggestion.instrument_type === "etf" ? "ETF" : suggestion.market === "HK" ? "港股" : "A股"}</small></span>
         </button>)}
       </div>
-      <p role="status" className={styles.hint}>{loading ? "正在搜索…" : result.message || (suggestions.length ? "选择股票自动填写 · ↑↓ 选择，Enter 确认" : "未找到匹配股票，可继续手动填写。")}</p>
+      <p role="status" className={styles.hint}>{loading ? "正在搜索…" : result.message || (suggestions.length ? "选择股票自动填写 · ↑↓ 选择，Enter 确认" : "未找到匹配标的，可继续手动填写。")}</p>
     </div>}
   </div>;
 }

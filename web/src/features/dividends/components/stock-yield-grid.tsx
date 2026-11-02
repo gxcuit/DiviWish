@@ -48,6 +48,6 @@ export function StockYieldGrid({ stock, onSave }: {
         <tbody>{(stock.yield_grid || []).map(row => <tr key={row.yield} className={row.reached ? styles.reached : ""}><td>{percentage(row.yield)}%</td><td>{row.price === null ? "—" : `${stock.market === "HK" ? "HK$" : "¥"}${row.price.toFixed(2)}`}</td><td>{row.reached === null ? "待核实" : row.reached ? "已达到" : "未达到"}</td></tr>)}</tbody>
       </table>
     </div>
-    <p className={styles.hint}>当前采用{yieldLabels[stock.yield_basis || "annual"]}。{stock.yield_basis === "custom" ? "对应价格 = 当前价格 × 自定义股息率 ÷ 网格股息率。" : `对应价格 = ${stock.yield_basis === "rolling" ? "滚动年度" : "年度"}每股股息 ÷ 网格股息率；港股按汇率换算。`}按已保存设置展示，上限未对齐时止于最后一格。</p>
+    <p className={styles.hint}>当前采用{yieldLabels[stock.yield_basis || "annual"]}。{stock.yield_basis === "custom" ? "对应价格 = 当前价格 × 自定义股息率 ÷ 网格股息率。" : `对应价格 = ${stock.yield_basis === "rolling" ? "滚动年度" : "年度"}${stock.instrument_type === "etf" ? "每份分红" : "每股股息"} ÷ 网格股息率；港股按汇率换算。`}按已保存设置展示，上限未对齐时止于最后一格。</p>
   </section>;
 }
