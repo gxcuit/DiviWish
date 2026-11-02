@@ -5,7 +5,7 @@ import { timestamp } from "./validation.ts";
 import type { DividendSnapshot, Providers, StockRecord, StockRow } from "./types.ts";
 
 const QUOTE_FIELDS = ["price", "change_pct", "quote_date", "year_start_price", "year_start_year", "year_start_date", "year_start_adjustment"];
-const DIVIDEND_FIELDS = ["annual_dividend", "rolling_dividend", "annual_year", "confirmed", "ex_dividend_date", "dividends",
+const DIVIDEND_FIELDS = ["instrument_type", "exchange", "next_ex_dividend_date", "dividend_calendar_dates", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start", "annual_dividend", "rolling_dividend", "annual_year", "confirmed", "ex_dividend_date", "dividends",
   "dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"];
 const unchanged = (before: StockRecord, after: StockRecord, keys: string[]) =>
   keys.every(key => JSON.stringify(before[key]) === JSON.stringify(after[key]));
@@ -22,7 +22,7 @@ async function dividendSnapshots(records: StockRecord[], source: Providers, erro
       try {
         if (!source.fetchDividends) throw new Error("分红来源未配置");
         snapshots.set(stock.id!, await source.fetchDividends(stock));
-      } catch { errors.push(`${stock.code}：未获取到可核实的完整年度股息，保留原股息与明细`); }
+      } catch { errors.push(`${stock.code}：${stock.instrument_type === "etf" ? "ETF 分红获取失败" : "未获取到可核实的完整年度股息"}，保留原股息与明细`); }
     }));
   }
   return snapshots;
@@ -48,7 +48,7 @@ export async function refreshStocks(db: D1Database, userId: string, records: Sto
   const changes: { stock: StockRecord; applyQuote: boolean; applyDividends: boolean; statement: D1PreparedStatement }[] = [];
   for (const stock of records) {
     const row = await db.prepare("SELECT * FROM user_stocks WHERE user_id=? AND id=?").bind(userId, stock.id!).first<StockRow>();
-    if (!row || row.code !== stock.code || row.market !== stock.market) {
+    if (!row || row.code !== stock.code || row.market !== stock.market || readRow(row).instrument_type !== stock.instrument_type || readRow(row).exchange !== stock.exchange) {
       errors.push(`${stock.code}：刷新期间股票已修改或删除，跳过旧数据`); continue;
     }
     const current = readRow(row), patch: Record<string, unknown> = {};
@@ -61,7 +61,7 @@ export async function refreshStocks(db: D1Database, userId: string, records: Sto
     if (applyQuote) Object.assign(patch, quote);
     if (applyDividends) Object.assign(patch, snapshot, { verification_note: null });
     Object.assign(patch, { updated_at: now, _refresh_id: marker,
-      source: applyDividends ? `${applyQuote ? "腾讯实时行情；" : "报价来自保存数据；"}东方财富公开分红资料` : "腾讯实时行情；分红及历史来自保存数据" });
+      source: applyDividends ? `${applyQuote ? "腾讯实时行情；" : "报价来自保存数据；"}${snapshot?.dividend_source || "东方财富公开分红资料"}` : "腾讯实时行情；分红及历史来自保存数据" });
     changes.push({ stock, applyQuote, applyDividends, statement: db.prepare("UPDATE user_stocks SET document=json_patch(document,?) " +
       "WHERE user_id=? AND id=? AND code=? AND market=? AND document=?")
       .bind(JSON.stringify(patch), userId, stock.id!, stock.code, stock.market, row.document) });

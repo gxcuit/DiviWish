@@ -27,6 +27,8 @@ export interface LegacyEnv {
 
 export interface StockRecord extends Record<string, unknown> {
   id?: number;
+  instrument_type?: "stock" | "etf";
+  exchange?: "sh" | "sz" | "bj" | "hk" | null;
   code: string;
   market: "A" | "HK";
   name: string;
@@ -70,12 +72,20 @@ export interface StockRow {
 }
 
 export interface DividendSnapshot {
-  annual_dividend: number;
-  rolling_dividend: number;
+  annual_dividend: number | null;
+  rolling_dividend: number | null;
   annual_year: number;
   confirmed: boolean;
   ex_dividend_date: string | null;
   dividends: { period: string; dps: number; status: string; date?: string; hkd_dps?: number }[];
+  next_ex_dividend_date?: string | null;
+  dividend_calendar_dates?: string[];
+  dividend_verification?: "matched" | "mismatch" | "unavailable";
+  dividend_note?: string;
+  dividend_as_of?: string;
+  dividend_annual_start?: string;
+  dividend_annual_end?: string;
+  dividend_rolling_start?: string;
   dividend_source: string;
   dividend_updated_at: string;
   dividend_fx_rate: number | null;
@@ -93,7 +103,7 @@ export type Quote = { price: number; change_pct?: number | null; quote_date: str
 export type Period = "day" | "week" | "month";
 export type Bar = { date: string; close: number };
 export type Kline = { bars: Bar[]; adjustment: "qfq" | "none"; quote: Quote | null };
-export type Suggestion = Pick<StockRecord, "name" | "code" | "market">;
+export type Suggestion = Pick<StockRecord, "name" | "code" | "market" | "instrument_type" | "exchange">;
 export interface HistorySnapshot {
   history: { date: string; yield: number; close: number; annual: number; year: number; rolling_yield?: number }[];
   history_version?: number;

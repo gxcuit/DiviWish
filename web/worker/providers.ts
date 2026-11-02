@@ -1,3 +1,4 @@
+import { fetchEtfDividends } from "./etf.ts";
 import { fetchDividends, fetchHistoricalDividends } from "./dividends.ts";
 import { buildHistory, historyEnd, yearsBefore } from "./history.ts";
 import { yearBaseline } from "./financial-metrics.ts";
@@ -5,8 +6,12 @@ import { number } from "./calculations.ts";
 import { dateString } from "./validation.ts";
 import type { Kline, Period, Providers, Quote, StockRecord, Suggestion } from "./types.ts";
 
-export function symbolFor(stock: Pick<StockRecord, "market" | "code">): string {
+export function symbolFor(stock: Pick<StockRecord, "market" | "code" | "instrument_type" | "exchange">): string {
   if (stock.market === "HK") return "hk" + stock.code;
+  if (stock.instrument_type === "etf") {
+    if (!["sh", "sz"].includes(stock.exchange ?? "")) throw new Error("ETF 交易所缺失");
+    return stock.exchange + stock.code;
+  }
   return (stock.code[0] === "6" ? "sh" : "489".includes(stock.code[0]) ? "bj" : "sz") + stock.code;
 }
 
@@ -58,12 +63,13 @@ export function parseSearch(text: string): Suggestion[] {
   for (const entry of content.split("^")) {
     const [exchange, code, name, , kind] = entry.split("~");
     const market = exchange === "hk" ? "HK" : ["sh", "sz", "bj"].includes(exchange) ? "A" : null;
-    if (!market || !kind?.startsWith("GP") || !name?.trim() || (market === "A" && kind !== "GP-A")) continue;
+    const isEtf = market === "A" && ["sh", "sz"].includes(exchange) && (kind === "ETF" || kind?.startsWith("JJ")) && /ETF/i.test(name) && (exchange === "sh" ? /^(51|52|56|58)\d{4}$/ : /^159\d{3}$/).test(code);
+    if (!market || !name?.trim() || (!isEtf && (!kind?.startsWith("GP") || (market === "A" && kind !== "GP-A")))) continue;
     if (!(market === "HK" ? /^[0-9]{5}$/ : /^[0-9]{6}$/).test(code)) continue;
     const identity = `${market}:${code}`;
     if (seen.has(identity)) continue;
     seen.add(identity);
-    results.push({ name: name.trim(), code, market });
+    results.push({ name: name.trim(), code, market, ...(isEtf ? { instrument_type: "etf" as const, exchange: exchange as "sh" | "sz" } : {}) });
     if (results.length === 10) break;
   }
   return results;
@@ -125,6 +131,7 @@ async function fetchTencentKline(stock: StockRecord, period: Period, param: stri
 
 export const providers: Providers = {
   async fetchHistory(stock) {
+    if (stock.instrument_type === "etf") throw new Error("ETF 历史派息率分位暂不支持");
     const end = historyEnd(), start = yearsBefore(end, 5);
     const ranges: { start: string; end: string }[] = [];
     for (let year = Number(start.slice(0, 4)); year <= Number(end.slice(0, 4)); year++) {
@@ -145,7 +152,7 @@ export const providers: Providers = {
     const [events, prices] = await Promise.all([fetchHistoricalDividends(stock, end), fetchPrices()]);
     return buildHistory(events, prices, end);
   },
-  fetchDividends(stock) { return fetchDividends(stock, () => providers.fetchFx()); },
+  fetchDividends(stock) { return stock.instrument_type === "etf" ? fetchEtfDividends(stock) : fetchDividends(stock, () => providers.fetchFx()); },
   async searchStocks(query) {
     return parseSearch(await load(`https://smartbox.gtimg.cn/s3/?${new URLSearchParams({ q: query, t: "all" })}`, "gbk", 6000));
   },

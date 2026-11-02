@@ -3,13 +3,15 @@ export interface DividendPart {
   dps: number;
   status: string;
   date?: string;
+  record_date?: string;
+  pay_date?: string;
 }
 
 export interface StockPreview {
   code: string;
   market: "A" | "HK";
   quote: { price: number; quote_date: string | null } | null;
-  dividends: { annual_dividend: number; annual_year: number; ex_dividend_date: string | null; confirmed: boolean } | null;
+  dividends: { annual_dividend: number | null; rolling_dividend?: number | null; dividend_note?: string; annual_year: number; ex_dividend_date: string | null; confirmed: boolean } | null;
   errors: string[];
 }
 
@@ -26,6 +28,16 @@ export interface Stock {
   grid_end: number;
   grid_step: number;
   id: number;
+  instrument_type?: 'stock' | 'etf';
+  exchange?: 'sh' | 'sz' | 'bj' | 'hk' | null;
+  next_ex_dividend_date?: string | null;
+  dividend_calendar_dates?: string[];
+  dividend_verification?: 'matched' | 'mismatch' | 'unavailable';
+  dividend_note?: string;
+  dividend_as_of?: string;
+  dividend_annual_start?: string;
+  dividend_annual_end?: string;
+  dividend_rolling_start?: string;
   code: string;
   name: string;
   sector: string;

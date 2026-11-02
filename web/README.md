@@ -1,5 +1,9 @@
 # DiviWish · 息望
 
+## ETF 派息功能（2026-11-02）
+
+新增沪深 ETF 的搜索添加、年度／滚动派息率、逐次分红、待除息日历、自选和网格；默认滚动口径，暂不提供历史分位。详见 [ETF 说明](docs/etf.md)。
+
 当前版本支持邮箱密码和 LinuxDO 登录，使用服务端个人数据库。股票、自选、板块、设置均按账号隔离，不使用浏览器 localStorage 保存业务数据。代码统一维护在 [gxcuit/DiviWish](https://github.com/gxcuit/DiviWish) 的 `multi-user`（稳定）/ `develop`（集成）分支；单机版见同仓库 `main` 分支。分支约定见 [分支与发布流程](docs/branches.md)。
 
 功能介绍与当前界面截图见 [项目首页](../README.md)。本页说明安装、配置与开发。
