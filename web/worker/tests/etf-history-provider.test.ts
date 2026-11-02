@@ -45,3 +45,55 @@ test("a confirmed non-distributing ETF is not applicable even when the price ser
   assert.equal(result.history.length, 0);
   assert.match(result.history_note, /暂无已除息现金分红/);
 });
+
+test("ETF dividend fragments must match the fund and missing completed cash triggers one bounded fresh request", async t => {
+  const { fetchEtfDividends, parseEtfPage } = await import("../etf.ts");
+  const { samples } = JSON.parse(readFileSync(new URL("./fixtures/etf/public-samples.json", import.meta.url), "utf8"));
+  const sample = samples["510880"], stock = validate({ code: "510880", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector: "ETF" });
+  const wrongIdentity = `<label>2026年度 <a href='http://fund.eastmoney.com/000001.html'>其他基金</a> 累计分红0元/份。</label>`;
+  assert.throws(() => parseEtfPage(sample.html + wrongIdentity, "510880"), /片段证券身份/);
+  let primaryCalls = 0;
+  const empty = samples["159915"].html.replaceAll("159915", "510880");
+  const mock = t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes("sina")) return new Response(sample.sina);
+    primaryCalls++;
+    if (primaryCalls === 1) return new Response(empty);
+    assert.ok(new URL(url).searchParams.has("verification"));
+    return new Response(sample.html);
+  });
+  const recovered = await fetchEtfDividends(stock);
+  assert.equal(primaryCalls, 2);
+  assert.ok(recovered.dividends.length > 1);
+  assert.equal(recovered.dividend_verification, "matched");
+  mock.mock.restore();
+  primaryCalls = 0;
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    if (String(input).includes("sina")) return new Response(sample.sina);
+    primaryCalls++; return new Response(empty);
+  });
+  await assert.rejects(fetchEtfDividends(stock), /分红记录不完整/);
+  assert.equal(primaryCalls, 2);
+});
+
+test("ETF invalid fragment retry also works when the secondary source is unavailable; rate limits never retry", async t => {
+  const { fetchEtfDividends } = await import("../etf.ts");
+  const { samples } = JSON.parse(readFileSync(new URL("./fixtures/etf/public-samples.json", import.meta.url), "utf8"));
+  const stock = validate({ code: "510880", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector: "ETF" });
+  let primaryCalls = 0;
+  const mock = t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    if (String(input).includes("sina")) return new Response("offline", { status: 503 });
+    primaryCalls++;
+    return new Response(primaryCalls === 1 ? "invalid page" : samples["510880"].html);
+  });
+  const recovered = await fetchEtfDividends(stock);
+  assert.equal(primaryCalls, 2); assert.equal(recovered.dividend_verification, "unavailable");
+  assert.ok(recovered.dividends.length > 1);
+  mock.mock.restore(); primaryCalls = 0;
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    if (String(input).includes("sina")) return new Response("offline", { status: 503 });
+    primaryCalls++; return new Response("limited", { status: 429 });
+  });
+  await assert.rejects(fetchEtfDividends(stock), /HTTP 429/);
+  assert.equal(primaryCalls, 1);
+});
