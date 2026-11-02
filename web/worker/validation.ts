@@ -81,11 +81,11 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     }
   }
   if (changed(["annual_dividend", "code", "market", "instrument_type", "exchange"])) {
-    for (const field of ["history_source", "history_updated_at", "history_note"]) delete stock[field];
+    for (const field of ["history_source", "history_updated_at", "history_note", "history_version", "history_status"]) delete stock[field];
     for (const field of ["dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"]) delete stock[field];
     Object.assign(stock, { dividends: [], history: [], percentile_start: null, percentile_end: null, annual_year: null,
       source: "手动编辑（分红或证券身份已变更，历史对比已清除）", verification_note: "手动分红需自行核实；相关历史对比已清除。" });
-    for (const field of ["next_ex_dividend_date", "dividend_calendar_dates", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start"]) delete stock[field];
+    for (const field of ["next_ex_dividend_date", "dividend_calendar_dates", "dividend_splits", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start"]) delete stock[field];
     if (!("rolling_dividend" in input)) stock.rolling_dividend = null;
     if (!("confirmed" in input)) stock.confirmed = false;
     if (changed(["code", "market", "instrument_type", "exchange"])) {

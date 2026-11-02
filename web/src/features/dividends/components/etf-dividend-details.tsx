@@ -1,10 +1,11 @@
+import { EtfHistory } from "./etf-history";
 import type { StockDetail } from "../types";
 import styles from "./dashboard.module.css";
 
 const cash = (value: number | null) => value === null ? "—" : `¥${value.toFixed(4)}`;
 const rate = (value: number | null) => value === null ? "—" : `${(value * 100).toFixed(2)}%`;
 
-export function EtfDividendDetails({ stock }: { stock: StockDetail }) {
+export function EtfDividendDetails({ stock, historyState, onRetry }: { stock: StockDetail; historyState?: { loading: boolean; error: string }; onRetry: () => void }) {
   return <>
     <div className={styles.detailMetrics}>
       <div><span>上一自然年派息率（{stock.annual_year ?? "—"}）</span><strong>{rate(stock.dividend_yield)}</strong><small className={styles.metricNote}>{stock.dividend_annual_start || "待查询"} 至 {stock.dividend_annual_end || "待查询"} 已除息分红合计 ÷ 当前场内价格。</small></div>
@@ -19,7 +20,7 @@ export function EtfDividendDetails({ stock }: { stock: StockDetail }) {
     <p className={styles.muted}>现金分红合计按可核实的拆分比例折算至统计日份额；原始逐次金额保留分红时口径。ETF 实际派息率与跟踪指数股息率不同。</p>
     {stock.dividend_note && <p className={stock.dividend_verification === "matched" ? styles.muted : styles.formError} role="status">{stock.dividend_note}</p>}
     {stock.verification_note && <p className={styles.formError}>{stock.verification_note}</p>}
-    <p className={styles.muted}>ETF 历史派息率分位暂不支持。</p>
+    <EtfHistory key={stock.id} stock={stock} state={historyState} onRetry={onRetry} />
     <h3>逐次现金分红（人民币／份）</h3>
     {stock.dividends.length ? <div className={styles.dividendParts}>{stock.dividends.map(part => <div key={part.date || part.period}>
       <span>除息 {part.date || part.period}<small>{part.status} · 登记 {part.record_date || "—"}<br />发放 {part.pay_date || "—"}</small></span><strong>{cash(part.dps)}</strong>

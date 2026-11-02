@@ -1,4 +1,5 @@
-import { fetchEtfDividends } from "./etf.ts";
+import { buildEtfHistory } from "./etf-history.ts";
+import { fetchEtfData, fetchEtfDividends } from "./etf.ts";
 import { fetchDividends, fetchHistoricalDividends } from "./dividends.ts";
 import { buildHistory, historyEnd, yearsBefore } from "./history.ts";
 import { yearBaseline } from "./financial-metrics.ts";
@@ -131,7 +132,6 @@ async function fetchTencentKline(stock: StockRecord, period: Period, param: stri
 
 export const providers: Providers = {
   async fetchHistory(stock) {
-    if (stock.instrument_type === "etf") throw new Error("ETF 历史派息率分位暂不支持");
     const end = historyEnd(), start = yearsBefore(end, 5);
     const ranges: { start: string; end: string }[] = [];
     for (let year = Number(start.slice(0, 4)); year <= Number(end.slice(0, 4)); year++) {
@@ -149,6 +149,12 @@ export const providers: Providers = {
       }
       return bars;
     };
+    if (stock.instrument_type === "etf") {
+      const data = await fetchEtfData(stock);
+      // No cash distributions is conclusive even if the price service is down.
+      const prices = data.page.dividends.some(row => row.date <= end) ? await fetchPrices() : [];
+      return buildEtfHistory(data.page, data.sina, prices, end);
+    }
     const [events, prices] = await Promise.all([fetchHistoricalDividends(stock, end), fetchPrices()]);
     return buildHistory(events, prices, end);
   },

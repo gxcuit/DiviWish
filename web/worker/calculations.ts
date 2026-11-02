@@ -75,20 +75,23 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
   const [selectedYield, basisDividend] = selectedBasis(stock, fxRate);
   const gap = selectedYield !== null && target !== null ? selectedYield - target : null;
   const startPrice = number(stock.year_start_price);
-  // Keep stored annual samples intact; expose a separate series for the saved basis.
-  const history = (stock.instrument_type === "etf" ? [] : stock.history || []).flatMap(row => {
+  const etf = stock.instrument_type === "etf";
+  const historyDividend = etf ? rolling : basisDividend;
+  const currentYield = etf ? rollingYield : selectedYield;
+  // ETF history is always trailing cash by ex-date, independent of the list/grid basis.
+  const history = (etf && (stock.history_version !== 3 || stock.history_status !== "ready") ? [] : stock.history || []).flatMap(row => {
     const close = number(row.close);
-    const value = stock.yield_basis === "custom"
+    const value = etf ? number(row.rolling_yield) : stock.yield_basis === "custom"
       ? basisDividend !== null && close !== null && close > 0 ? basisDividend / close : null
       : number(stock.yield_basis === "rolling" ? row.rolling_yield : row.yield);
     return value !== null && Number.isFinite(value) && value >= 0 ? [{ date: row.date, close: row.close, yield: value }] : [];
   });
   const values = history.map(row => row.yield).sort((a, b) => a - b);
-  const validHistory = values.length >= 60;
+  const validHistory = values.length >= 60 && (!etf || values.some(value => value > 0));
   const aPrice = aPrices[stock.a_code ?? ""] || number(stock.a_price);
   const quantile = (probability: number): [number | null, number | null] => {
     const value = validHistory ? values[Math.ceil(probability / 100 * values.length) - 1] : null;
-    const quantilePrice = basisDividend !== null && value && value > 0 ? basisDividend / value : null;
+    const quantilePrice = historyDividend !== null && value && value > 0 ? historyDividend / value : null;
     return [value, quantilePrice];
   };
   const [q60, p60] = quantile(60), [q90, p90] = quantile(90);
@@ -101,7 +104,7 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     yield_gap: gap, status: yieldStatus(gap),
     ...stock.instrument_type === "etf" ? { payout_ratio: null, payout_note: "ETF 不适用个股股息支付率" } : payoutMetrics(stock),
     year_change: price && startPrice && startPrice > 0 && (!stock.year_start_year || stock.year_start_year === Number(stock.quote_date?.slice(0, 4))) ? price / startPrice - 1 : null,
-    percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
+    percentile: validHistory && currentYield !== null ? values.filter(value => value <= currentYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
     percentile_history: history,
     percentile_start: history[0]?.date ?? null,

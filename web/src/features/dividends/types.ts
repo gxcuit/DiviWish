@@ -16,6 +16,7 @@ export interface StockPreview {
 }
 
 export interface Stock {
+  history_status?: "ready" | "not_applicable";
   history_version?: number;
   history_updated_at?: string;
   history_note?: string;

@@ -10,8 +10,8 @@ export interface EtfDividend {
   dps: number;
   status: string;
 }
-interface Split { date: string; ratio: number }
-export interface EtfPage { dividends: EtfDividend[]; splits: Split[]; split_warning: boolean }
+export interface EtfSplit { date: string; ratio: number }
+export interface EtfPage { dividends: EtfDividend[]; splits: EtfSplit[]; split_warning: boolean }
 const text = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/\s+/g, " ").trim();
 const rounded = (value: number) => Math.round(value * 1e10) / 1e10;
 
@@ -36,7 +36,7 @@ export function parseEtfPage(html: string, code: string): EtfPage {
   }
   if (!events.length && !dividends.some(row => row[0] === "暂无分红信息!")) throw new Error("ETF 分红表为空，不能确认为无分红");
   const splitTable = tables.find(rows => rows[0]?.includes("拆分折算比例"));
-  const splits: Split[] = []; let warning = !splitTable;
+  const splits: EtfSplit[] = []; let warning = !splitTable;
   for (const row of splitTable?.slice(1) ?? []) {
     if (row.length === 1 && row[0] === "暂无拆分信息!") continue;
     const day = dateString(row[1]), match = row[3]?.match(/^([0-9.]+):([0-9.]+)$/);
@@ -47,23 +47,29 @@ export function parseEtfPage(html: string, code: string): EtfPage {
   return { dividends: events.sort((a, b) => a.date.localeCompare(b.date)), splits, split_warning: warning };
 }
 
-export function parseSinaDividends(body: string, symbol: string): Map<string, number> {
+export function parseSinaActions(body: string, symbol: string): { dividends: Map<string, number>; splits: EtfSplit[] } {
   const match = body.match(/^\s*var\s+([a-z]+\d+)hfq\s*=\s*(\{[^\n]*\})\s*;?\s*(?:\n|\/\*|$)/);
   if (!match || match[1] !== symbol) throw new Error("新浪 ETF 证券身份或格式无效");
   const payload = JSON.parse(match[2]);
   if (!Array.isArray(payload.data) || payload.data.length !== payload.total || !payload.data.length) throw new Error("新浪 ETF 记录不完整");
   const rows = payload.data.map((row: Record<string, unknown>) => ({ date: dateString(row.d), cash: Number(row.u), split: Number(row.s), factor: Number(row.f) }));
   rows.sort((a: { date: string | null }, b: { date: string | null }) => (a.date ?? "").localeCompare(b.date ?? ""));
-  const result = new Map<string, number>(); let previous = 0; const seen = new Set<string>();
+  const result = new Map<string, number>(), splits: EtfSplit[] = []; let previous = 0, previousSplit = 1; const seen = new Set<string>();
   for (const row of rows) {
     if (!row.date || !Number.isFinite(row.cash) || row.cash < 0 || !Number.isFinite(row.split) || row.split <= 0 || row.factor !== 1 || seen.has(row.date)) throw new Error("新浪 ETF 累计记录无法核实");
     seen.add(row.date);
     if (row.date === "1900-01-01") { if (row.cash !== 0) throw new Error("新浪占位值异常"); continue; }
+    if (Math.abs(row.split / previousSplit - 1) > 1e-8) splits.push({ date: row.date, ratio: row.split / previousSplit });
+    previousSplit = row.split;
     const delta = rounded(row.cash - previous); previous = row.cash;
     if (delta < 0) throw new Error("新浪累计分红发生回退，不能直接差分");
     if (delta > 0) result.set(row.date, delta);
   }
-  return result;
+  return { dividends: result, splits };
+}
+
+export function parseSinaDividends(body: string, symbol: string): Map<string, number> {
+  return parseSinaActions(body, symbol).dividends;
 }
 
 export function etfSnapshot(page: EtfPage, sina: Map<string, number> | null, asOf = timestamp().slice(0, 10)): DividendSnapshot {
@@ -91,7 +97,7 @@ export function etfSnapshot(page: EtfPage, sina: Map<string, number> | null, asO
   return { annual_dividend: annual, rolling_dividend: rolling, annual_year: year, confirmed: past.length > 0,
     ex_dividend_date: past.at(-1)?.date ?? null, next_ex_dividend_date: future[0]?.date ?? null,
     dividends: [...page.dividends].reverse().map(row => ({ ...row, status: row.date > asOf ? "待除息" : row.pay_date > asOf ? "已除息，待发放" : "已发放" })),
-    dividend_calendar_dates: page.dividends.map(row => row.date), dividend_verification: verification,
+    dividend_calendar_dates: page.dividends.map(row => row.date), dividend_splits: { rows: page.splits, warning: page.split_warning }, dividend_verification: verification,
     dividend_note: notes, dividend_as_of: asOf, dividend_annual_start: `${year}-01-01`, dividend_annual_end: `${year}-12-31`, dividend_rolling_start: cutoff,
     dividend_source: "天天基金 ETF 分红明细；新浪 ETF 累计分红交叉核验", dividend_updated_at: timestamp(), dividend_fx_rate: null };
 }
@@ -113,13 +119,18 @@ async function load(url: string): Promise<string> {
   return new TextDecoder().decode(bytes);
 }
 
-export async function fetchEtfDividends(stock: StockRecord): Promise<DividendSnapshot> {
+export async function fetchEtfData(stock: StockRecord) {
   if (stock.market !== "A" || !["sh", "sz"].includes(stock.exchange ?? "") || !/^\d{6}$/.test(stock.code)) throw new Error("ETF 市场或交易所无效");
   const symbol = `${stock.exchange}${stock.code}`;
   const [main, check] = await Promise.allSettled([
     load(`https://fundf10.eastmoney.com/fhsp_${stock.code}.html`).then(body => parseEtfPage(body, stock.code)),
-    load(`https://finance.sina.com.cn/realstock/company/${symbol}/hfq.js`).then(body => parseSinaDividends(body, symbol)),
+    load(`https://finance.sina.com.cn/realstock/company/${symbol}/hfq.js`).then(body => parseSinaActions(body, symbol)),
   ]);
   if (main.status !== "fulfilled") throw main.reason;
-  return etfSnapshot(main.value, check.status === "fulfilled" ? check.value : null);
+  return { page: main.value, sina: check.status === "fulfilled" ? check.value : null };
+}
+
+export async function fetchEtfDividends(stock: StockRecord): Promise<DividendSnapshot> {
+  const { page, sina } = await fetchEtfData(stock);
+  return etfSnapshot(page, sina?.dividends ?? null);
 }

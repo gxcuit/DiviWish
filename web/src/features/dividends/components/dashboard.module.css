@@ -175,3 +175,12 @@
 @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
 
 .historyRetry { margin-left: 10px; color: #b45309; text-decoration: underline; font-size: 12px; }
+
+.historySlider { width: 100%; accent-color: #c5392e; }
+
+.etfPlot { position: relative; padding-left: 42px; height: 190px; margin-top: 16px; }
+.etfPlot svg { width: 100%; height: 100%; overflow: visible; }
+.etfAxis { position: absolute; left: 0; top: 14px; bottom: 10px; display: flex; flex-direction: column; justify-content: space-between; color: #6b7280; font-size: 10px; }
+.etfLegend { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin: 8px 0; font-size: 11px; }
+.etfLegend span:first-child { color: #b45309; }
+.etfLegend span:last-child { color: #7c3aed; }
