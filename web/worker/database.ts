@@ -1,4 +1,5 @@
 import type { SqliteDatabase } from "./types.ts";
+import { starterStocks } from "./starter-portfolio.ts";
 import { DEFAULT_STOCK } from "./validation.ts";
 import type { StockRecord, StockRow } from "./types.ts";
 
@@ -13,10 +14,19 @@ export function document(stock: StockRecord): string {
 }
 
 export async function initialize(db: SqliteDatabase) {
+  // Claim a fresh, empty portfolio inside the same transaction as both inserts.
+  // An existing initialized portfolio stays empty after the user deletes stocks.
+  const pending = "EXISTS(SELECT 1 FROM metadata WHERE key='initialized' AND value='\"starter_pending\"')";
   await db.batch([
+    db.prepare("INSERT OR IGNORE INTO metadata(key,value) SELECT 'initialized'," +
+      "CASE WHEN EXISTS(SELECT 1 FROM stocks) OR EXISTS(SELECT 1 FROM metadata) THEN 'true' ELSE '\"starter_pending\"' END"),
+    ...starterStocks().map(stock => db.prepare("INSERT OR IGNORE INTO stocks(code,market,name,sector,watched,document,imported) " +
+      `SELECT ?,?,?,?,0,?,0 WHERE ${pending}`).bind(stock.code, stock.market, stock.name, stock.sector, document(stock))),
+    db.prepare("UPDATE metadata SET value='true' WHERE key='initialized' AND value='\"starter_pending\"'"),
     db.prepare("INSERT OR IGNORE INTO sectors(name) SELECT sector FROM stocks GROUP BY sector ORDER BY MIN(id)"),
     db.prepare("INSERT OR IGNORE INTO sectors(name) VALUES('未分类')"),
-    db.prepare("INSERT OR IGNORE INTO metadata(key,value) VALUES('initialized','true')"),
+    db.prepare("INSERT OR IGNORE INTO sectors(name) SELECT 'ETF' WHERE NOT EXISTS(SELECT 1 FROM metadata WHERE key='etf_sector_v1')"),
+    db.prepare("INSERT OR IGNORE INTO metadata(key,value) VALUES('etf_sector_v1','true')"),
   ]);
 }
 

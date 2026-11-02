@@ -50,7 +50,9 @@ try {
   for (const route of ["/login", "/register", "/reset-password", "/api/auth/session", "/api/auth/login", "/api/auth/register", "/api/auth/linuxdo/start"]) {
     assert.equal((await request(route)).status, 404, route);
   }
-  assert.deepEqual((await (await request("/api/stocks")).json()).stocks, []);
+  const initial = await (await request("/api/stocks")).json();
+  assert.deepEqual(initial.stocks.map(s => s.code), ["600036", "510880"]);
+  assert.ok(initial.sectors.includes("ETF"));
   assert.equal(service.db.sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name IN ('users','auth_sessions','user_stocks')").get().n, 0);
   assert.equal((await request("/api/stocks", "GET", undefined, { Host: "evil.example" })).status, 403);
   const payload = { code: "600001", market: "A", name: "单机持久化测试", sector: "银行", price: 10, annual_dividend: 0.5 };
