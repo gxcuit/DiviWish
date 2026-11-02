@@ -106,10 +106,9 @@ export function createHandler(source: Providers = providers) {
         const id = Number(stockMatch[1]), stock = await store.stock(id);
         if (!stock) throw new HttpError(404, "股票不存在");
         if (stockMatch[2] === "/history") {
-          if (stock.instrument_type === "etf") throw new HttpError(400, "ETF 历史派息率分位暂不支持");
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);
-          if (stock.history_version === 2 && stock.history.length >= 60 && typeof stock.history_updated_at === "string" && stock.history_updated_at.startsWith(timestamp().slice(0, 10))) {
+          if (url.searchParams.get("refresh") !== "1" && stock.history_version === (stock.instrument_type === "etf" ? 3 : 2) && (stock.history.length >= 60 || stock.history_status === "not_applicable") && typeof stock.history_updated_at === "string" && stock.history_updated_at.startsWith(timestamp().slice(0, 10))) {
             return json(render(stock, await store.stocks(), await store.meta(), true));
           }
           if (!source.fetchHistory) throw new HttpError(503, "历史数据来源尚未配置");
@@ -117,7 +116,7 @@ export function createHandler(source: Providers = providers) {
           try { snapshot = await source.fetchHistory(stock); }
           catch (error) { throw new HttpError(502, `历史分位获取失败：${error instanceof Error ? error.message : "历史数据来源暂不可用"}。已保留原有历史数据。`); }
           const current = await store.stock(id);
-          const relevant = ["code", "market", "instrument_type", "exchange", "annual_dividend", "history", "history_updated_at"];
+          const relevant = ["code", "market", "instrument_type", "exchange", "annual_dividend", "rolling_dividend", "dividends", "dividend_splits", "history", "history_updated_at"];
           if (!current || relevant.some(key => JSON.stringify(current[key]) !== JSON.stringify(stock[key]))) throw new HttpError(409, "股票数据已变更，跳过旧历史计算，请重试");
           if (await store.save({ ...current, ...snapshot }, current) === null) throw new HttpError(409, "股票数据已变更，请重试");
           return json(render((await store.stock(id))!, await store.stocks(), await store.meta(), true));

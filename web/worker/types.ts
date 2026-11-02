@@ -73,6 +73,7 @@ export interface DividendSnapshot {
   dividends: { period: string; dps: number; status: string; date?: string; hkd_dps?: number }[];
   next_ex_dividend_date?: string | null;
   dividend_calendar_dates?: string[];
+  dividend_splits?: { rows: { date: string; ratio: number }[]; warning: boolean };
   dividend_verification?: "matched" | "mismatch" | "unavailable";
   dividend_note?: string;
   dividend_as_of?: string;
@@ -98,7 +99,8 @@ export type Bar = { date: string; close: number };
 export type Kline = { bars: Bar[]; adjustment: "qfq" | "none"; quote: Quote | null };
 export type Suggestion = Pick<StockRecord, "name" | "code" | "market" | "instrument_type" | "exchange">;
 export interface HistorySnapshot {
-  history: { date: string; yield: number; close: number; annual: number; year: number; rolling_yield?: number }[];
+  history: { date: string; yield: number; close: number; annual?: number; year?: number; rolling_yield?: number }[];
+  history_status?: "ready" | "not_applicable";
   history_version?: number;
   percentile_start: string;
   percentile_end: string;

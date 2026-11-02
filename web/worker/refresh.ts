@@ -5,7 +5,7 @@ import { timestamp } from "./validation.ts";
 import type { DividendSnapshot, Providers, StockRecord, StockRow } from "./types.ts";
 
 const QUOTE_FIELDS = ["price", "change_pct", "quote_date", "year_start_price", "year_start_year", "year_start_date", "year_start_adjustment"];
-const DIVIDEND_FIELDS = ["instrument_type", "exchange", "next_ex_dividend_date", "dividend_calendar_dates", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start", "annual_dividend", "rolling_dividend", "annual_year", "confirmed", "ex_dividend_date", "dividends",
+const DIVIDEND_FIELDS = ["instrument_type", "exchange", "next_ex_dividend_date", "dividend_calendar_dates", "dividend_splits", "dividend_verification", "dividend_note", "dividend_as_of", "dividend_annual_start", "dividend_annual_end", "dividend_rolling_start", "annual_dividend", "rolling_dividend", "annual_year", "confirmed", "ex_dividend_date", "dividends",
   "dividend_source", "dividend_updated_at", "dividend_fx_rate", "dividend_hkd_annual", "dividend_hkd_rolling", "annual_eps", "annual_eps_year", "annual_eps_currency", "payout_dividend", "payout_currency"];
 const unchanged = (before: StockRecord, after: StockRecord, keys: string[]) =>
   keys.every(key => JSON.stringify(before[key]) === JSON.stringify(after[key]));
@@ -59,7 +59,12 @@ export async function refreshStocks(db: SqliteDatabase, records: StockRecord[], 
     if (snapshot && !applyDividends) errors.push(`${stock.code}：刷新期间股息已修改，保留手动修改`);
     if (!applyQuote && !applyDividends) continue;
     if (applyQuote) Object.assign(patch, quote);
-    if (applyDividends) Object.assign(patch, snapshot, { verification_note: null });
+    if (applyDividends) {
+      Object.assign(patch, snapshot, { verification_note: null });
+      if (stock.instrument_type === "etf" && !unchanged(current, { ...current, ...snapshot }, ["dividends", "rolling_dividend", "dividend_note", "dividend_splits"])) {
+        Object.assign(patch, { history: [], history_version: null, history_status: null, history_updated_at: null, history_note: null, percentile_start: null, percentile_end: null });
+      }
+    }
     Object.assign(patch, { updated_at: now, _refresh_id: marker,
       source: applyDividends ? `${applyQuote ? "腾讯实时行情；" : "报价来自保存数据；"}${snapshot?.dividend_source || "东方财富公开分红资料"}` : "腾讯实时行情；分红及历史来自保存数据" });
     changes.push({ stock, applyQuote, applyDividends, statement: db.prepare("UPDATE stocks SET document=json_patch(document,?) " +

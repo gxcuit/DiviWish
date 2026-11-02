@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { etfSnapshot, fetchEtfDividends, parseEtfPage, parseSinaDividends } from "../etf.ts";
-import { parseSearch, providers, symbolFor } from "../providers.ts";
+import { parseSearch, symbolFor } from "../providers.ts";
 import { validate } from "../validation.ts";
 import { fixture } from "./helpers.ts";
 
@@ -81,9 +81,9 @@ test("ETF search and explicit exchanges route quotes correctly; old stock defaul
   assert.throws(() => validate({ code: "510880", market: "A", name: "ETF", sector: "ETF", instrument_type: "etf", exchange: "sz" }), /沪深 ETF/);
 });
 
-test("ETF API persists calendar, default rolling basis and settings; refresh failure retains values; history never runs", async t => {
+test("ETF API persists calendar, default rolling basis and settings; refresh failure retains values; history requests preserve failures", async t => {
   let historyCalls = 0;
-  const f = fixture({ fetchDividends: async () => snapshot("159331"), fetchHistory: async () => { historyCalls++; throw new Error("must not run"); } });
+  const f = fixture({ fetchDividends: async () => snapshot("159331"), fetchHistory: async () => { historyCalls++; throw new Error("offline"); } });
   t.after(() => f.db.sqlite.close());
   const created = await f.request("/api/stocks", "POST", { code: "159331", market: "A", instrument_type: "etf", exchange: "sz", name: "测试ETF", sector: "ETF", price: 1, target_yield: 0.05 });
   assert.equal(created.status, 201);
@@ -97,9 +97,8 @@ test("ETF API persists calendar, default rolling basis and settings; refresh fai
   assert.equal(detail.percentile, null);
   assert.equal(detail.dividend_verification, "matched");
   assert.equal(detail.next_ex_dividend_date, "2026-11-04");
-  assert.equal((await f.request(`/api/stocks/${saved.id}/history`, "POST", {})).status, 400);
-  await assert.rejects(providers.fetchHistory!(etf()), /暂不支持/);
-  assert.equal(historyCalls, 0);
+  assert.equal((await f.request(`/api/stocks/${saved.id}/history`, "POST", {})).status, 502);
+  assert.equal(historyCalls, 1);
   const listing = await (await f.request("/api/stocks")).json();
   assert.ok(listing.stocks.find((row: { id: number }) => row.id === saved.id).dividend_calendar_dates.length > 1);
   assert.equal((await f.request(`/api/stocks/${saved.id}`, "PATCH", { watched: true, grid_start: 0.02, yield_basis: "annual" })).status, 200);
@@ -118,4 +117,57 @@ test("ETF refresh skips changed identity while upstream requests are in flight",
   };
   assert.equal((await f.request(`/api/stocks/${created.id}/refresh`, "POST", {})).status, 502);
   assert.equal((await (await f.request(`/api/stocks/${created.id}`)).json()).annual_dividend, null);
+});
+
+test("ETF history caches success/not-applicable, supports forced retry, and rejects concurrent cash edits", async t => {
+  let calls = 0;
+  const f = fixture({ fetchHistory: async () => { calls++; return { history: [], history_version: 3, history_status: "not_applicable", percentile_start: "", percentile_end: "", history_updated_at: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10) + "T10:00:00+08:00", history_source: "test", history_note: "查询成功，无分红" }; } });
+  t.after(() => f.db.sqlite.close());
+  const saved = await (await f.request("/api/stocks", "POST", { code: "512890", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector: "ETF", price: 1, rolling_dividend: 0 })).json();
+  const url = `/api/stocks/${saved.id}/history`;
+  assert.equal((await f.request(url, "POST", {})).status, 200);
+  const detail = await (await f.request(`/api/stocks/${saved.id}`)).json();
+  assert.equal(detail.history_status, "not_applicable");
+  assert.equal(detail.percentile, null);
+  assert.equal((await f.request(url, "POST", {})).status, 200);
+  assert.equal(calls, 1);
+  assert.equal((await f.request(url + "?refresh=1", "POST", {})).status, 200);
+  assert.equal(calls, 2);
+  const original = f.source.fetchHistory!;
+  f.source.fetchHistory = async stock => {
+    await f.request(`/api/stocks/${stock.id}`, "PATCH", { rolling_dividend: 0.1 });
+    return original(stock);
+  };
+  assert.equal((await f.request(url + "?refresh=1", "POST", {})).status, 409);
+  assert.equal((await (await f.request(`/api/stocks/${saved.id}`)).json()).rolling_dividend, 0.1);
+});
+
+test("ETF ready histories survive outages, retain concurrent watch settings and invalidate when distributions change", async t => {
+  const sample = snapshot("159331");
+  const f = fixture({ fetchDividends: async () => sample });
+  t.after(() => f.db.sqlite.close());
+  const saved = await (await f.request("/api/stocks", "POST", { code: "159331", market: "A", instrument_type: "etf", exchange: "sz", name: "ETF", sector: "ETF", price: 1 })).json();
+  await f.request(`/api/stocks/${saved.id}/refresh`, "POST", {});
+  f.source.fetchHistory = async () => {
+    await f.request(`/api/stocks/${saved.id}`, "PATCH", { watched: true });
+    return { history: Array.from({ length: 60 }, (_, i) => ({ date: new Date(Date.UTC(2026, 7, i + 1)).toISOString().slice(0, 10), close: 1, yield: 0.02 + i / 1000, rolling_yield: 0.02 + i / 1000 })), history_version: 3, history_status: "ready", percentile_start: "2026-08-01", percentile_end: "2026-09-29", history_source: "test", history_updated_at: new Date().toISOString(), history_note: "test" };
+  };
+  assert.equal((await f.request(`/api/stocks/${saved.id}/history`, "POST", {})).status, 200);
+  const before = await (await f.request(`/api/stocks/${saved.id}`)).json();
+  assert.equal(before.watched, true);
+  assert.equal(before.percentile_count, 60);
+  assert.equal(before.quantile_90_price, before.rolling_dividend / before.quantile_90_yield);
+  await f.request(`/api/stocks/${saved.id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.9 });
+  const custom = await (await f.request(`/api/stocks/${saved.id}`)).json();
+  assert.equal(custom.percentile, before.percentile);
+  assert.equal(custom.quantile_60_price, before.quantile_60_price);
+  f.source.fetchHistory = async () => { throw new Error("offline"); };
+  assert.equal((await f.request(`/api/stocks/${saved.id}/history?refresh=1`, "POST", {})).status, 502);
+  assert.deepEqual((await (await f.request(`/api/stocks/${saved.id}`)).json()).history, before.history);
+  f.source.fetchDividends = async () => ({ ...sample, rolling_dividend: 0.05 });
+  assert.equal((await f.request(`/api/stocks/${saved.id}/refresh`, "POST", {})).status, 200);
+  const changed = await (await f.request(`/api/stocks/${saved.id}`)).json();
+  assert.equal(changed.history.length, 0);
+  assert.equal(changed.percentile, null);
+  assert.notEqual(changed.history_version, 3);
 });
