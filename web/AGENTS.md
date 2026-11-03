@@ -26,3 +26,5 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 上级目录的 Excel 脚本与工作簿独立维护；首次快照导入使用 `--source ..`，不得覆盖现有数据库或自动运行上级更新脚本。
 
 - 版本归属及双端同步规则见 [项目记忆](../MEMORY.md)：唯一仓库为 `gxcuit/DiviWish`；单机版用 `main` / `codex/standalone`，多人版用 `multi-user` / `develop`；通用功能与 bug 修复两版同步，停用原私有仓库。
+
+- README 面向用户，说明功能、更新、使用入口与截图；分支、架构、开发和部署说明放在 `docs/`，技术命令见 `docs/setup.md`，目录见 `docs/index.md`。

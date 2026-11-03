@@ -35,7 +35,7 @@ Cloudflare 生产环境使用 Workers Static Assets + Worker API + 原生 D1，�
 
 ## 数据保留
 
-`backend/data/` 的原 SQLite、备份和 seed，以及 `.wrangler/state/` 旧 D1 均保留，当前启动器不读写。新账号初始为空，不自动认领旧数据。测试使用独立临时数据库，不清空或重建个人数据库。
+`backend/data/` 的原 SQLite、备份和 seed，以及 `.wrangler/state/` 旧 D1 均保留，当前启动器不读写。新账号提供两个默认观察标的，不自动认领旧个人数据。测试使用独立临时数据库，不清空或重建个人数据库。
 
 私人 seed、SQLite、SQL/JSON 备份、邮件收信记录、密钥和账号配置不能放入 `public/` 或 `out/`。网站不会执行根目录 Excel 更新脚本。
 
@@ -52,3 +52,13 @@ ETF历史缓存版本4同时保存年度和滚动序列：年度按各交易日�
 本轮单机版74项、多人版103项业务测试及两版lint、类型检查、webpack构建、临时SQLite HTTP检查通过；多人版另通过dry-run和隔离workerd登录回归。浏览器在1280/320像素验证新用户默认列表、ETF分类筛选与所属板块选项、重载持久化以及主动删除后不补回。所有测试均使用独立临时数据库。
 
 公开分红缓存由 `worker/dividend-cache.ts` 与 `migrations/0005_public_dividends.sql` 实现。价格和分红按两个阶段请求，分红在每天首次使用时更新并跨账号复用；数据库中的租约防止不同 Worker 实例重复取数。个人股票文档仍独立，公共表只接收公开来源结果，详见[账号数据分层](accounts.md#公开分红与个人数据分层)。
+
+## 仓库与运行入口
+
+- 根 `README.md` 与 `web/README.md`：产品功能、更新、用户操作和截图。
+- `web/src/`：网页与业务界面；`web/worker/`：当前业务 API；`web/migrations/`：数据库迁移。
+- `web/scripts/`：启动、构建与检查；`web/docs/`：安装、架构、分支、数据口径和截图。
+- `web/backend/`：保留的 Flask 历史实现和本机数据，不读取或清理其中的数据库、备份和初始快照。
+- 根 `scripts/`、`data/`、`run.cmd` / `run.sh`：独立 Excel 跟踪流程，参见[Excel 说明](../../docs/excel-workflow.md)。网站入口为 `web/run.cmd`。
+
+分支选择、下载约定与同步规则见[分支说明](branches.md)，具体运行命令见[安装指南](setup.md)。
