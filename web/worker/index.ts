@@ -1,10 +1,11 @@
 import { initialize } from "./database.ts";
 import { BollingerService } from "./bollinger.ts";
+import { dailyDividend } from "./dividend-cache.ts";
 import { bodyJson, HttpError, json, protectWrites, validated } from "./http.ts";
 import { portfolio } from "./portfolio.ts";
 import { providers } from "./providers.ts";
 import { render } from "./render.ts";
-import { refreshStocks } from "./refresh.ts";
+import { refreshOptions, refreshStocks } from "./refresh.ts";
 import { sectorName, timestamp, validate } from "./validation.ts";
 import type { Env, Providers, Suggestion } from "./types.ts";
 
@@ -27,7 +28,7 @@ export function createHandler(source: Providers = providers) {
         stock.id = 0; // Temporary quote identity; preview never writes to the portfolio.
         const [quotes, dividends] = await Promise.allSettled([
           source.fetchQuotes([stock]),
-          source.fetchDividends ? source.fetchDividends(stock) : Promise.reject(new Error("分红来源未配置")),
+          dailyDividend(db, stock, source, url.searchParams.get("dividends") === "force").then(result => result.snapshot),
         ]);
         const quote = quotes.status === "fulfilled" ? quotes.value.quotes.get(0) ?? null : null;
         const snapshot = dividends.status === "fulfilled" ? dividends.value : null;
@@ -124,7 +125,7 @@ export function createHandler(source: Providers = providers) {
         if (stockMatch[2] === "/refresh") {
           if (method !== "POST") throw new HttpError(405, "请使用 POST 刷新股票");
           await bodyJson(request);
-          return await refreshStocks(db, [stock], source);
+          return await refreshStocks(db, [stock], source, false, refreshOptions(url));
         }
         if (stockMatch[2] === "/boll") {
           if (method !== "GET") throw new HttpError(405, "不支持的请求方法");
@@ -137,7 +138,7 @@ export function createHandler(source: Providers = providers) {
         if (await store.save(updated, stock) === null) throw new HttpError(409, "股票已变更，请刷新后重试");
         return json(render((await store.stock(id))!, await store.stocks(), await store.meta()));
       }
-      if (path === "/api/refresh" && method === "POST") { await bodyJson(request); return await refreshStocks(db, await store.stocks(), source, true); }
+      if (path === "/api/refresh" && method === "POST") { await bodyJson(request); return await refreshStocks(db, await store.stocks(), source, true, refreshOptions(url)); }
       throw new HttpError(404, "接口不存在");
     } catch (error) {
       if (error instanceof HttpError) return json({ error: error.message }, error.status, error.status === 429 ? { "Retry-After": "60" } : {});

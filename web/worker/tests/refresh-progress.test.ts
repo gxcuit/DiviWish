@@ -35,7 +35,7 @@ test("slow portfolio refresh resumes after the last batch across handler restart
     method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
   }), f.env);
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.slice(0, 4), ["600009", "600010", "600011", "600012"]);
+  assert.deepEqual(calls, ["600009", "600010", "600011"]); // The single-refreshed last stock is already cached.
   for (const id of ids.slice(8)) assert.equal((await (await f.request(`/api/stocks/${id}`)).json()).annual_dividend, 0.5);
 });
 

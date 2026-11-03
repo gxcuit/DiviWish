@@ -29,7 +29,7 @@ test("single-stock refresh and preview preserve dividend features without any ac
   assert.ok(!("_refresh_id" in detail));
   f.source.fetchQuotes = async () => { throw new Error("offline"); };
   f.source.fetchDividends = async () => { throw new Error("offline"); };
-  assert.equal((await f.request("/api/stocks/1/refresh", "POST", {})).status, 502);
+  assert.equal((await f.request("/api/stocks/1/refresh?dividends=force", "POST", {})).status, 502);
   assert.deepEqual(await (await f.request("/api/stocks/1")).json(), detail);
 });
 
@@ -40,7 +40,7 @@ test("refresh preserves manual dividends and quotes during upstream requests", a
     await f.request("/api/stocks/1", "PATCH", { annual_dividend: 3, price: 70, watched: true, grid_end: 0.09 });
     return structuredClone(dividend);
   };
-  assert.equal((await f.request("/api/stocks/1/refresh", "POST", {})).status, 502);
+  assert.equal((await f.request("/api/stocks/1/refresh?dividends=force", "POST", {})).status, 502);
   const detail = await (await f.request("/api/stocks/1")).json();
   assert.equal(detail.annual_dividend, 3); assert.equal(detail.price, 70); assert.equal(detail.watched, true); assert.equal(detail.grid_end, 0.09);
 });
