@@ -2,7 +2,7 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `cc151b70-52b6-40d4-b01b-0514513d8515`，于 2026-11-03（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `0770f95` 发布，标签为 `0770f95`，接收 100% 流量。本次增加跨用户共享的公共分红日缓存，并在刷新时先显示价格，再检查当天分红。上一生产版本为 `e55da894-5d66-433e-9df5-6c50c4684e94`。
+当前生产版本为 `3f512f5f-6c8a-4ff9-b497-62334a3d15b2`，于 2026-11-03（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `7360e74` 发布，标签为 `7360e74`，接收 100% 流量。本次修正股票分红日期展示，区分所属报告期、公告、登记、除息及发放日期，并分开显示最近已除息和下次除息。上一生产版本为 `cc151b70-52b6-40d4-b01b-0514513d8515`。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
 
@@ -158,3 +158,14 @@ npx wrangler rollback 9dc1a1b2-fb67-40d4-a0f9-5e608cc7c0bf --env production
 Worker 代码回退不会撤销 D1 迁移或恢复数据库内容；独立生产账号库应保留，不执行删除或清空。
 
 参考：[Wrangler secrets](https://developers.cloudflare.com/workers/configuration/secrets/)、[D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)、[Workers Node crypto](https://developers.cloudflare.com/workers/runtime-apis/nodejs/crypto/)。
+
+
+## 2026-11-03 股票分红日期与中谷物流核验
+
+- 修复年度明细仅显示未标注的报告期、隐藏实际除息日期的问题；明确财年合计与自然年到账合计的区别。逐笔展示报告期、除息、登记、发放、预案公告与方案公告日期，并显示分红原始来源及更新时间。
+- 对照公司公告核验中谷物流原始资料：2025 中期 0.43 元/股在 2025-09-29 除息，2025 年末 0.24 元/股在 2026-05-28 除息，2025 财年合计 0.67 元/股。完整来源及自然年口径对照见 [分红日期说明](dividend-dates.md)。A 股接口未提供发放日期时显示缺失；港股使用独立的 `DIVIDEND_DATE`，不以除息日或停止过户区间推断。
+- 未来除息日单独保存为下次除息，最近已除息只取截至当日的日期；股票全部已知除息日期可进入日历。股票公共缓存格式升为 v2，ETF 仍为 v1；每天共享和并发去重机制保留。无需数据库迁移，已有用户点刷新后补齐字段，不批量改写个人数据。
+- 单机版 `main` / `codex/standalone` 代码提交 `10cb6a4`，多人版 `multi-user` / `develop` 代码提交 `7360e74`，均已推送 GitHub。单机 90 项、多人 119 项业务回归，以及两版 lint、类型检查、webpack 静态构建、HTTP 运行检查、多人原生 workerd 检查通过。两版手机 Chromium 在临时数据库加载公开中谷物流样本，验证日期字段、财年明细、缺失发放日期、来源链接及无横向溢出。
+- 生产 dry-run 通过；发布前核对 OAuth 账号与权限、生产目标及当前版本，以 `--env production --keep-vars` 发布。版本 `3f512f5f-6c8a-4ff9-b497-62334a3d15b2` 接收 100% 流量，发布前后 15 项绑定完整一致，未修改数据库结构、密钥或用户数据。
+- 两个域名各 10 项只读 HTTP 检查通过（健康、登录注册页面、认证配置、未登录 401、跨站写入 403）；各 10 个 JS/CSS 产物与本次本地构建的 SHA-256 完全相同。未登录真实用户账号测试写入，也未发送真实邮件。上线验证报告为被忽略的 `.local/dividend-dates-production-verification.json`；浏览器报告位于主工作区 `.local/dividend-date-standalone.json` 和 `.local/dividend-date-multi.json`。
+- 本节文档提交晚于部署，实际部署源码仍为 `7360e74`。
