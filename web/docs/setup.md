@@ -2,7 +2,7 @@
 
 本页集中说明安装、配置、部署、备份与检查命令。所有网站命令均从 `web/` 运行。功能介绍见[项目首页](../../README.md)，版本维护约定见[分支说明](branches.md)。
 
-当前工作机在 WSL 中优先遵循[已验证的 Linux Node 与 webpack 流程](local-wsl.md)，不要混用 Windows 与 Linux 原生依赖。
+Windows、Linux 和 WSL 统一使用 `npm run build` 构建 webpack 静态页面；也可显式运行 `npm run build:webpack`。`npm run check` 的构建阶段调用相同入口，单机 Docker 也沿用此入口。依赖必须在各自操作系统内用 `npm ci` 安装，详见[跨平台构建说明](build.md)；本机 WSL 的 Node 路径及启动排查见[WSL 记录](local-wsl.md)。
 
 线上服务地址：[DiviWish · 息望](https://diviwish.shaunko.tech)。生产配置、数据库迁移与回退见[发布指南](cloudflare-deployment.md)。
 

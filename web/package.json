@@ -20,6 +20,7 @@
     "dev:web": "next dev --hostname 127.0.0.1",
     "backend": "node scripts/backend.mjs",
     "build": "node scripts/build.mjs",
+    "build:webpack": "node scripts/build.mjs",
     "start": "node scripts/preview.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc -p worker/tsconfig.json",
