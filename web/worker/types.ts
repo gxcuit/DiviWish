@@ -76,7 +76,7 @@ export interface DividendSnapshot {
   annual_year: number;
   confirmed: boolean;
   ex_dividend_date: string | null;
-  dividends: { period: string; dps: number; status: string; date?: string; hkd_dps?: number }[];
+  dividends: { period: string; dps: number; status: string; date?: string; record_date?: string; pay_date?: string; notice_date?: string; plan_notice_date?: string; hkd_dps?: number }[];
   next_ex_dividend_date?: string | null;
   dividend_calendar_dates?: string[];
   dividend_splits?: { rows: { date: string; ratio: number }[]; warning: boolean };

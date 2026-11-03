@@ -8,6 +8,10 @@ interface Event {
   confirmed: boolean;
   exDate: string | null;
   notice: string | null;
+  recordDate: string | null;
+  payDate: string | null;
+  planNotice: string | null;
+  latestNotice: string | null;
   amount: () => number;
   hkdAmount?: () => number;
   nativeCash?: { amount: number; currency: string };
@@ -63,7 +67,8 @@ export function parseDividends(rows: Row[], stock: Pick<StockRecord, "code" | "m
   const events = new Map<string, Event>(), unsupportedYears: number[] = [];
   for (const row of rows) {
     if (String(row.SECURITY_CODE ?? "") !== stock.code) throw new Error("分红接口返回了其他证券的数据");
-    const notice = date(row.PLAN_NOTICE_DATE) ?? date(row.NOTICE_DATE);
+    const planNotice = date(row.PLAN_NOTICE_DATE);
+    const notice = planNotice ?? date(row.NOTICE_DATE);
     if (notice && notice > today) continue;
     const period = stock.market === "A" ? date(row.REPORT_DATE) : hkPeriod(row);
     if (!period) {
@@ -78,7 +83,11 @@ export function parseDividends(rows: Row[], stock: Pick<StockRecord, "code" | "m
     const confirmed = /不分配|不分红/.test(progress) || Boolean(implemented && exDate && exDate <= today);
     const status = stock.market === "A" ? progress : exDate && exDate <= today ? "已除净" : "已公告，待除净";
     const rawEps = typeof row.BASIC_EPS === "number" || typeof row.BASIC_EPS === "string" && String(row.BASIC_EPS).trim() ? Number(row.BASIC_EPS) : NaN;
-    const next: Event = { period, status, confirmed, exDate, notice,
+    const next: Event = { period, status, confirmed, exDate, notice, planNotice, latestNotice: date(row.NOTICE_DATE),
+      recordDate: date(row.EQUITY_RECORD_DATE),
+      // HK DIVIDEND_DATE is the payment date; A-share detail rows may omit it.
+      // Never substitute EX_DIVIDEND_DATE for a missing payment date.
+      payDate: date(stock.market === "HK" ? row.DIVIDEND_DATE : row.PAY_DATE),
       eps: Number.isFinite(rawEps) ? rawEps : null, nativeCash: nativeCash(row),
       amount: () => stock.market === "A" ? cashA(row) : cashHk(row, fxRate).cny,
       ...(stock.market === "HK" ? { hkdAmount: () => cashHk(row, fxRate).hkd } : {}) };
@@ -99,9 +108,14 @@ export function parseDividends(rows: Row[], stock: Pick<StockRecord, "code" | "m
   const nativeParts = annual.filter(event => event.amount() !== 0);
   const payoutCurrency = nativeParts[0]?.nativeCash?.currency ?? null;
   const nativeValid = nativeParts.every(event => event.nativeCash && event.nativeCash.currency === payoutCurrency);
+  const exDates = [...new Set([...events.values()].map(event => event.exDate).filter((value): value is string => value !== null))].sort();
   return { annual_dividend: total(annual), rolling_dividend: total(rolling), annual_year: year,
-    confirmed: annual.every(event => event.confirmed), ex_dividend_date: [...events.values()].map(event => event.exDate).filter((value): value is string => value !== null).sort().at(-1) ?? null,
-    dividends: annual.map(event => ({ period: event.period, dps: round(event.amount()), status: event.status, ...(event.exDate ? { date: event.exDate } : {}), ...(event.hkdAmount ? { hkd_dps: event.hkdAmount() } : {}) })),
+    confirmed: annual.every(event => event.confirmed), ex_dividend_date: exDates.filter(value => value <= today).at(-1) ?? null,
+    next_ex_dividend_date: exDates.find(value => value > today) ?? null, dividend_calendar_dates: exDates,
+    dividends: annual.map(event => ({ period: event.period, dps: round(event.amount()), status: event.status,
+      ...(event.exDate ? { date: event.exDate } : {}), ...(event.recordDate ? { record_date: event.recordDate } : {}),
+      ...(event.payDate ? { pay_date: event.payDate } : {}), ...(event.latestNotice ? { notice_date: event.latestNotice } : {}),
+      ...(event.planNotice ? { plan_notice_date: event.planNotice } : {}), ...(event.hkdAmount ? { hkd_dps: event.hkdAmount() } : {}) })),
     dividend_hkd_annual: round(annual.reduce((sum, event) => sum + (event.hkdAmount?.() ?? 0), 0)),
     dividend_hkd_rolling: round(rolling.reduce((sum, event) => sum + (event.hkdAmount?.() ?? 0), 0)),
     annual_eps: stock.market === "A" ? events.get(annualPeriod)?.eps ?? null : null,

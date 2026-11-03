@@ -116,3 +116,22 @@ test("quote refresh completes without fetching dividends; the dividend phase reu
   assert.equal(second.dividends_cached, 1); assert.equal(dividends, 1); assert.equal(quotes, 1);
   assert.equal((await f.request("/api/refresh?phase=invalid", "POST", {})).status, 400);
 });
+
+
+test("old daily stock snapshots cannot hide corrected dates, while ETF cache keys stay stable", async t => {
+  const db = new TestDatabase(); t.after(() => db.sqlite.close());
+  const stock = sampleStocks()[0];
+  const key = dividendCacheKey(stock);
+  assert.ok(key.startsWith("v2:"));
+  assert.ok(dividendCacheKey({ ...stock, instrument_type: "etf" }).startsWith("v1:"));
+  const { timestamp } = await import("../validation.ts");
+  await db.binding.prepare("INSERT INTO public_dividend_cache(security_key,cache_day,snapshot) VALUES(?,?,?)")
+    .bind(key.replace(/^v2:/, "v1:"), timestamp().slice(0, 10), JSON.stringify(snapshot)).run();
+  const updated = { ...snapshot, next_ex_dividend_date: "2026-11-10", dividend_calendar_dates: ["2026-11-10"],
+    dividends: [{ period: "2025-12-31", dps: 0.5, status: "实施分配", date: "2026-11-10", record_date: "2026-11-09", notice_date: "2026-11-01" }] };
+  let calls = 0;
+  const source = sourceWith(async () => { calls++; return updated; });
+  assert.equal((await dailyDividend(db.binding, stock, source)).cached, false);
+  assert.deepEqual((await dailyDividend(db.binding, stock, source)).snapshot, updated);
+  assert.equal(calls, 1);
+});

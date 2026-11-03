@@ -5,6 +5,7 @@
 - [产品功能与截图](../../README.md)
 - [功能更新记录与本次说明对照](release-notes.md)
 - [ETF 使用与数据说明](etf.md)
+- [股票分红日期口径与中谷物流核验](dividend-dates.md)
 - [股息、历史分位、网格与 BOLL 口径](calculations.md)
 
 ## 安装与维护

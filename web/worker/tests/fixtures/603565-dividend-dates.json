@@ -1,0 +1,42 @@
+{
+  "source": "https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_SHAREBONUS_DET&columns=ALL&filter=(SECURITY_CODE%3D%22603565%22)",
+  "retrieved_on": "2026-11-03",
+  "rows": [
+    {
+      "SECURITY_CODE": "603565",
+      "REPORT_DATE": "2025-12-31 00:00:00",
+      "PRETAX_BONUS_RMB": 2.4,
+      "PLAN_NOTICE_DATE": "2026-04-23 00:00:00",
+      "NOTICE_DATE": "2026-05-22 00:00:00",
+      "EQUITY_RECORD_DATE": "2026-05-27 00:00:00",
+      "EX_DIVIDEND_DATE": "2026-05-28 00:00:00",
+      "ASSIGN_PROGRESS": "实施分配",
+      "IMPL_PLAN_PROFILE": "10派2.40元(含税,扣税后2.16元)",
+      "BASIC_EPS": 0.95
+    },
+    {
+      "SECURITY_CODE": "603565",
+      "REPORT_DATE": "2025-06-30 00:00:00",
+      "PRETAX_BONUS_RMB": 4.3,
+      "PLAN_NOTICE_DATE": "2025-08-30 00:00:00",
+      "NOTICE_DATE": "2025-09-23 00:00:00",
+      "EQUITY_RECORD_DATE": "2025-09-26 00:00:00",
+      "EX_DIVIDEND_DATE": "2025-09-29 00:00:00",
+      "ASSIGN_PROGRESS": "实施分配",
+      "IMPL_PLAN_PROFILE": "10派4.30元(含税,扣税后3.87元)",
+      "BASIC_EPS": 0.51
+    },
+    {
+      "SECURITY_CODE": "603565",
+      "REPORT_DATE": "2024-12-31 00:00:00",
+      "PRETAX_BONUS_RMB": 7.9,
+      "PLAN_NOTICE_DATE": "2025-04-01 00:00:00",
+      "NOTICE_DATE": "2025-04-29 00:00:00",
+      "EQUITY_RECORD_DATE": "2025-05-07 00:00:00",
+      "EX_DIVIDEND_DATE": "2025-05-08 00:00:00",
+      "ASSIGN_PROGRESS": "实施分配",
+      "IMPL_PLAN_PROFILE": "10派7.90元(含税,扣税后7.11元)",
+      "BASIC_EPS": 0.87
+    }
+  ]
+}
