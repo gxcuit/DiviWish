@@ -2,7 +2,7 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `3f512f5f-6c8a-4ff9-b497-62334a3d15b2`，于 2026-11-03（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `7360e74` 发布，标签为 `7360e74`，接收 100% 流量。本次修正股票分红日期展示，区分所属报告期、公告、登记、除息及发放日期，并分开显示最近已除息和下次除息。上一生产版本为 `cc151b70-52b6-40d4-b01b-0514513d8515`。
+当前生产版本为 `4a800f12-5a2b-473c-9b3d-1cd89b38ea81`，于 2026-11-03（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `44b8e16` 发布，标签为 `44b8e16`，接收 100% 流量。本次补齐 `QDII-ETF` 搜索分类，修复 513530、513110 等境内上市跨境 ETF 被过滤的问题。上一生产版本为 `3f512f5f-6c8a-4ff9-b497-62334a3d15b2`。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
 
@@ -169,3 +169,12 @@ Worker 代码回退不会撤销 D1 迁移或恢复数据库内容；独立生产
 - 生产 dry-run 通过；发布前核对 OAuth 账号与权限、生产目标及当前版本，以 `--env production --keep-vars` 发布。版本 `3f512f5f-6c8a-4ff9-b497-62334a3d15b2` 接收 100% 流量，发布前后 15 项绑定完整一致，未修改数据库结构、密钥或用户数据。
 - 两个域名各 10 项只读 HTTP 检查通过（健康、登录注册页面、认证配置、未登录 401、跨站写入 403）；各 10 个 JS/CSS 产物与本次本地构建的 SHA-256 完全相同。未登录真实用户账号测试写入，也未发送真实邮件。上线验证报告为被忽略的 `.local/dividend-dates-production-verification.json`；浏览器报告位于主工作区 `.local/dividend-date-standalone.json` 和 `.local/dividend-date-multi.json`。
 - 本节文档提交晚于部署，实际部署源码仍为 `7360e74`。
+
+
+## 2026-11-03 QDII-ETF 搜索修复
+
+- 真实腾讯检索响应将 513530（港股通红利ETF华泰柏瑞）和 513110 标为 `QDII-ETF`；旧筛选仅兼容 `ETF`、`JJ…` 标签，导致正常结果被过滤。现精确兼容该标签，继续核对境内上市交易所、ETF 名称及支持的代码范围，不放入联接基金、LOF、境外上市 ETF 或未知类型。
+- 修复前应用真实 `searchStocks("513530")` 复现为空；修复后真实查询 513530、513110、510880 均返回正确名称、ETF 类型和上海交易所。API 回归在临时数据库验证搜索、保存为 ETF、默认滚动口径及账号重复检索去重；未借助生产用户账号写入测试。
+- 单机 `main` / `codex/standalone` 代码提交 `8ba7952`，多人 `multi-user` / `develop` 代码提交 `44b8e16`，均已推送 GitHub。两版 92／121 项业务回归、lint、类型检查及实际 HTTP 检查通过，多人本地 workerd 检查和生产 dry-run 通过。前端源码未变化，复用已验证的 webpack 静态构建；本次 Worker 重新打包。
+- 发布前核对 OAuth 账号、权限与生产绑定，使用 `--env production --keep-vars` 更新现有 Worker。新版本 `4a800f12-5a2b-473c-9b3d-1cd89b38ea81` 接收 100% 流量，发布前后全部 15 项绑定一致；没有数据库迁移或凭据更改。
+- 两个域名各 10 项只读健康、页面、认证与权限检查通过，各 10 个静态 JS/CSS 文件与已验证构建的 SHA-256 相同。报告保存在被忽略的 `.local/qdii-search-production-verification.json`。本节文档提交晚于部署，实际部署源码仍为 `44b8e16`。
