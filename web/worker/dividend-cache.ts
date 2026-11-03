@@ -27,7 +27,7 @@ function publicSnapshot(value: DividendSnapshot): DividendSnapshot {
 export function dividendCacheKey(stock: Pick<StockRecord, "market" | "code" | "instrument_type" | "exchange">) {
   const exchange = stock.market === "HK" ? "hk" : stock.instrument_type === "etf" ? stock.exchange ?? ""
     : stock.code[0] === "6" ? "sh" : "489".includes(stock.code[0]) ? "bj" : "sz";
-  return `v1:${stock.market}:${stock.instrument_type ?? "stock"}:${exchange}:${stock.code}`;
+  return `${stock.instrument_type === "etf" ? "v1" : "v2"}:${stock.market}:${stock.instrument_type ?? "stock"}:${exchange}:${stock.code}`;
 }
 
 /** One successful public fetch per security per China/Perth calendar day. */

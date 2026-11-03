@@ -164,7 +164,8 @@
 .chartLabels { display: flex; justify-content: space-between; color: #9ca3af; font-size: 10px; }
 .dividendParts { border: 1px solid #f3f4f6; border-radius: 10px; margin-bottom: 14px; }
 .dividendParts > div { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
-.dividendParts small { display: block; font-size: 10px; color: #9ca3af; }
+.dividendParts strong { flex-shrink: 0; margin-left: 8px; }
+.dividendParts small { line-height: 1.6; display: block; font-size: 10px; color: #9ca3af; }
 .detailButtons { display: flex; gap: 12px; margin-top: 22px; }
 .detailButtons button { flex: 1; border: 1px solid #e5e7eb; border-radius: 9px; padding: 10px; font-size: 13px; }
 .detailButtons button.dangerButton { border-color: #fecaca; color: #dc2626; background: #fff5f5; }

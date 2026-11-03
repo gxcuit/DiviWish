@@ -17,3 +17,10 @@ test("ETF calendar merges manual and provider dates once per stock and sorts onl
   assert.deepEqual(stock, original);
   assert.deepEqual(calendarEvents([{ ...etf, ex_dividend_date: null }], "2026-11"), []);
 });
+
+
+test("stock upcoming ex dates remain on the calendar separately from the most recent past ex date", () => {
+  const stock = { id: 3, instrument_type: "stock" as const, ex_dividend_date: "2025-09-29", next_ex_dividend_date: "2026-05-28", dividend_calendar_dates: ["2025-09-29", "2026-05-28"] };
+  assert.deepEqual(calendarEvents([stock], "2026-05").map(event => event.ex_dividend_date), ["2026-05-28"]);
+  assert.deepEqual(calendarEvents([stock], "2025-06"), []); // A report cutoff is never a calendar event.
+});

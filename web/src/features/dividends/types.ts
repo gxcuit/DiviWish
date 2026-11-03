@@ -4,6 +4,8 @@ export interface DividendPart {
   status: string;
   date?: string;
   record_date?: string;
+  notice_date?: string;
+  plan_notice_date?: string;
   pay_date?: string;
 }
 
@@ -79,6 +81,8 @@ export interface Stock {
   connect_yield: number | null;
   a_code: string | null;
   source: string;
+  dividend_source?: string;
+  dividend_updated_at?: string;
   verification_note: string | null;
 }
 
