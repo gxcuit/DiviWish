@@ -302,20 +302,30 @@ export function Dashboard({ user, onSignOut, linuxdoEnabled }: { user: Account; 
   async function refresh(stock?: Stock) {
     if (busy) return;
     setBusy(true); setNotice(""); setError(""); setDetailNotice(""); setDetailRefreshError("");
+    const messages: string[] = [], failures: string[] = [];
+    const route = stock ? `/stocks/${stock.id}/refresh` : "/refresh";
     try {
-      const result = await api<{ message: string; errors?: string[] }>(stock ? `/stocks/${stock.id}/refresh` : "/refresh", { method: "POST", body: "{}" });
-      await load();
-      const message = [result.message, ...(result.errors || [])].join("；");
-      if (stock) {
-        const updated = await api<StockDetail>(`/stocks/${stock.id}`);
-        setDetail(current => current?.id === stock.id ? updated : current);
-        setDetailNotice(message);
+      // Paint the new quote before the first daily dividend fetch can delay it.
+      for (const phase of ["quotes", "dividends"] as const) {
+        try {
+          const result = await api<{ message: string; errors?: string[] }>(`${route}?phase=${phase}`, { method: "POST", body: "{}" });
+          await load();
+          messages.push(result.message);
+          failures.push(...(result.errors || []));
+          if (stock) {
+            const updated = await api<StockDetail>(`/stocks/${stock.id}`);
+            setDetail(current => current?.id === stock.id ? updated : current);
+          }
+          const progress = phase === "quotes" ? "；正在检查今日分红…" : "";
+          setNotice(messages.join("；") + progress);
+          if (stock) setDetailNotice(messages.join("；") + progress);
+        } catch (failure) {
+          failures.push(`${phase === "quotes" ? "行情" : "分红"}更新：${failure instanceof Error ? failure.message : "请求失败，原值保留"}`);
+        }
       }
-      setNotice(message);
-    } catch (failure) {
-      const message = failure instanceof Error ? failure.message : "刷新失败，原值保持不变";
-      if (stock) setDetailRefreshError(message);
-      else setError(message);
+      setNotice(messages.join("；"));
+      if (stock) { setDetailNotice(messages.join("；")); setDetailRefreshError(failures.join("；")); }
+      else setError(failures.join("；"));
     } finally { setBusy(false); }
   }
 

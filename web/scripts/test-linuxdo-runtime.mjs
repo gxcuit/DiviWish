@@ -47,15 +47,17 @@ try {
   let response;
   for (let attempt = 0; attempt < 90; attempt++) {
     if (child.exitCode !== null) throw new Error(`workerd exited: ${logs.slice(-6000)}`);
-    try { response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(2000) }); } catch { /* Starting up. */ }
+    try { response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(2000) }); } catch { /* Starting up. */ }
     if (response) break;
     await delay(500);
   }
   assert.ok(response, `workerd did not start: ${logs.slice(-6000)}`);
+  // Startup polling must not repeatedly run stateful OAuth/cache regressions.
+  response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(30_000) });
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
-  assert.deepEqual(result, { runtime: "workerd", callback: true, session: true, portfolio: true, replayRejected: true, providerRedirectsRejected: true });
-  console.log(`Native workerd OAuth (${testDate}; production ${appDate}) passed: callback, session, D1 portfolio, replay and provider redirects. Only temporary data and simulated provider responses used.`);
+  assert.deepEqual(result, { runtime: "workerd", callback: true, session: true, portfolio: true, replayRejected: true, providerRedirectsRejected: true, dailyDividends: true });
+  console.log(`Native workerd OAuth (${testDate}; production ${appDate}) passed: callback, session, D1 portfolio, replay, provider redirects and daily public dividend cache/lease. Only temporary data and simulated provider responses used.`);
 } finally {
   if (child?.pid) {
     if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });

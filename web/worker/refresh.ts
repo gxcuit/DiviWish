@@ -1,5 +1,6 @@
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 import { readRow } from "./database.ts";
+import { dailyDividend, dividendAtFx } from "./dividend-cache.ts";
 import { HttpError, json } from "./http.ts";
 import { portfolio } from "./portfolio.ts";
 import { timestamp } from "./validation.ts";
@@ -11,9 +12,17 @@ const DIVIDEND_FIELDS = ["instrument_type", "exchange", "next_ex_dividend_date",
 const unchanged = (before: StockRecord, after: StockRecord, keys: string[]) =>
   keys.every(key => JSON.stringify(before[key]) === JSON.stringify(after[key]));
 
-async function dividendSnapshots(records: StockRecord[], source: Providers, errors: string[]) {
+type RefreshOptions = { phase?: "all" | "quotes" | "dividends"; forceDividends?: boolean };
+
+export function refreshOptions(url: URL): RefreshOptions {
+  const phase = url.searchParams.get("phase") ?? "all";
+  if (phase !== "all" && phase !== "quotes" && phase !== "dividends") throw new HttpError(400, "刷新阶段无效");
+  return { phase, forceDividends: url.searchParams.get("dividends") === "force" };
+}
+
+async function dividendSnapshots(db: D1Database, records: StockRecord[], source: Providers, errors: string[], force = false) {
   const snapshots = new Map<number, DividendSnapshot>(), deadline = Date.now() + 40_000;
-  let lastAttempted: number | null = null;
+  let lastAttempted: number | null = null, cached = 0;
   // Bound parallel upstream requests and finish within the browser's request timeout.
   for (let offset = 0; offset < records.length; offset += 4) {
     if (Date.now() >= deadline) {
@@ -22,28 +31,32 @@ async function dividendSnapshots(records: StockRecord[], source: Providers, erro
     }
     await Promise.all(records.slice(offset, offset + 4).map(async stock => {
       try {
-        if (!source.fetchDividends) throw new Error("分红来源未配置");
-        snapshots.set(stock.id!, await source.fetchDividends(stock));
-      } catch { errors.push(`${stock.code}：${stock.instrument_type === "etf" ? "ETF 分红获取失败" : "未获取到可核实的完整年度股息"}，保留原股息与明细`); }
+        const result = await dailyDividend(db, stock, source, force);
+        snapshots.set(stock.id!, result.snapshot);
+        if (result.cached) cached++;
+      } catch (error) { errors.push(`${stock.code}：${error instanceof Error ? error.message : "分红获取失败"}，保留原股息与明细`); }
     }));
     lastAttempted = records[Math.min(offset + 4, records.length) - 1].id!;
   }
-  return { snapshots, lastAttempted };
+  return { snapshots, lastAttempted, cached };
 }
 
 /** Called only after the handler obtains the owner from a verified session. */
-export async function refreshStocks(db: D1Database, userId: string, records: StockRecord[], source: Providers, resumeDividends = false) {
+export async function refreshStocks(db: D1Database, userId: string, records: StockRecord[], source: Providers, resumeDividends = false, options: RefreshOptions = {}) {
   if (!records.length) throw new HttpError(400, "请先添加股票");
   const store = portfolio(db, userId);
-  const cursor = resumeDividends ? (await store.meta()).dividend_refresh_cursor : null;
+  const meta = await store.meta(), phase = options.phase ?? "all";
+  const cursor = resumeDividends ? meta.dividend_refresh_cursor : null;
   const ordered = [...records].sort((first, second) => first.id! - second.id!);
   const start = typeof cursor === "number" ? Math.max(0, ordered.findIndex(stock => stock.id! > cursor)) : 0;
   const pending = [...ordered.slice(start), ...ordered.slice(0, start)];
   const errors: string[] = [];
-  const [quoteResult, { snapshots: dividends, lastAttempted }, fxResult] = await Promise.all([
-    source.fetchQuotes(records).catch(() => ({ quotes: new Map(), errors: ["腾讯行情请求失败，保留旧报价"] })),
-    dividendSnapshots(pending, source, errors),
-    records.some(stock => stock.market === "HK") ? source.fetchFx().catch(() => null) : Promise.resolve(null),
+  const [quoteResult, { snapshots: dividends, lastAttempted, cached }, fxResult] = await Promise.all([
+    phase === "dividends" ? Promise.resolve({ quotes: new Map(), errors: [] }) : source.fetchQuotes(records).catch(() => ({ quotes: new Map(), errors: ["腾讯行情请求失败，保留旧报价"] })),
+    phase === "quotes" ? Promise.resolve({ snapshots: new Map<number, DividendSnapshot>(), lastAttempted: null, cached: 0 })
+      : dividendSnapshots(db, pending, source, errors, options.forceDividends),
+    phase === "dividends" ? Promise.resolve(typeof meta.fx_rate === "number" ? meta.fx_rate : null)
+      : records.some(stock => stock.market === "HK") ? source.fetchFx().catch(() => null) : Promise.resolve(null),
   ]);
   errors.push(...quoteResult.errors);
   let fx = fxResult;
@@ -60,7 +73,8 @@ export async function refreshStocks(db: D1Database, userId: string, records: Sto
       errors.push(`${stock.code}：刷新期间股票已修改或删除，跳过旧数据`); continue;
     }
     const current = readRow(row), patch: Record<string, unknown> = {};
-    const quote = quoteResult.quotes.get(stock.id!), snapshot = dividends.get(stock.id!);
+    const quote = quoteResult.quotes.get(stock.id!), savedSnapshot = dividends.get(stock.id!);
+    const snapshot = savedSnapshot && stock.market === "HK" ? dividendAtFx(savedSnapshot, fx) : savedSnapshot;
     const applyQuote = Boolean(quote) && unchanged(stock, current, QUOTE_FIELDS);
     const applyDividends = Boolean(snapshot) && unchanged(stock, current, DIVIDEND_FIELDS);
     if (quote && !applyQuote) errors.push(`${stock.code}：刷新期间报价已修改，保留手动修改`);
@@ -84,7 +98,7 @@ export async function refreshStocks(db: D1Database, userId: string, records: Sto
   const progress = resumeDividends && lastAttempted !== null ? [store.setMeta("dividend_refresh_cursor", lastAttempted)] : [];
   if (!changes.length) {
     if (progress.length) await db.batch(progress);
-    return json({ message: "刷新未更新任何数据，原值保持不变", updated: 0, quotes_updated: 0, dividends_updated: 0, errors }, 502);
+    return json({ message: "刷新未更新任何数据，原值保持不变", updated: 0, quotes_updated: 0, dividends_updated: 0, dividends_cached: cached, errors }, 502);
   }
   const matched = "FROM user_stocks WHERE user_id=? AND json_extract(document,'$._refresh_id')=?";
   const setMeta = (key: string, value: unknown, filter = "") => db.prepare("INSERT INTO user_metadata(user_id,key,value) " +
@@ -102,6 +116,6 @@ export async function refreshStocks(db: D1Database, userId: string, records: Sto
   const quotesUpdated = results.filter((row, index) => row.meta.changes > 0 && changes[index].applyQuote).length;
   const dividendsUpdated = results.filter((row, index) => row.meta.changes > 0 && changes[index].applyDividends).length;
   if (updated !== changes.length) errors.push("刷新期间部分股票再次发生变更，已跳过旧数据，请重试");
-  return json({ message: updated ? `已更新 ${updated} 支股票：行情 ${quotesUpdated} 支，股息 ${dividendsUpdated} 支` : "刷新期间数据已变更，原值保持不变",
-    updated, quotes_updated: quotesUpdated, dividends_updated: dividendsUpdated, errors }, updated ? 200 : 502);
+  return json({ message: updated ? `已更新 ${updated} 支股票：行情 ${quotesUpdated} 支，股息 ${dividendsUpdated} 支${cached ? `（复用今日缓存 ${cached} 支）` : ""}` : "刷新期间数据已变更，原值保持不变",
+    updated, quotes_updated: quotesUpdated, dividends_updated: dividendsUpdated, dividends_cached: cached, errors }, updated ? 200 : 502);
 }

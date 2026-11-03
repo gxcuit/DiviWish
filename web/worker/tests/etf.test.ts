@@ -125,7 +125,7 @@ test("ETF API persists calendar, default rolling basis and settings; refresh fai
   assert.equal((await f.request(`/api/stocks/${saved.id}`, "PATCH", { watched: true, grid_start: 0.02, yield_basis: "annual" })).status, 200);
   const before = await (await f.request(`/api/stocks/${saved.id}`)).json();
   f.source.fetchDividends = async () => { throw new Error("offline"); };
-  assert.equal((await f.request(`/api/stocks/${saved.id}/refresh`, "POST", {})).status, 502);
+  assert.equal((await f.request(`/api/stocks/${saved.id}/refresh?dividends=force`, "POST", {})).status, 502);
   assert.deepEqual(await (await f.request(`/api/stocks/${saved.id}`)).json(), before);
 });
 
@@ -202,7 +202,7 @@ test("ETF ready histories survive outages, retain concurrent watch settings and 
   assert.equal((await f.request(`/api/stocks/${saved.id}/history?refresh=1`, "POST", {})).status, 502);
   assert.deepEqual((await (await f.request(`/api/stocks/${saved.id}`)).json()).history, before.history);
   f.source.fetchDividends = async () => ({ ...sample, rolling_dividend: 0.05 });
-  assert.equal((await f.request(`/api/stocks/${saved.id}/refresh`, "POST", {})).status, 200);
+  assert.equal((await f.request(`/api/stocks/${saved.id}/refresh?dividends=force`, "POST", {})).status, 200);
   const changed = await (await f.request(`/api/stocks/${saved.id}`)).json();
   assert.equal(changed.history.length, 0);
   assert.equal(changed.percentile, null);

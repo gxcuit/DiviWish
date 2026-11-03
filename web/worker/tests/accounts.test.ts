@@ -104,7 +104,7 @@ test("stock preview requires login, validates identity, supports partial failure
     return { annual_dividend: 2.7, rolling_dividend: 2.8, annual_year: 2025, confirmed: true, ex_dividend_date: "2026-07-01",
       dividends: [], dividend_source: "test", dividend_updated_at: "2026-10-28", dividend_fx_rate: null };
   };
-  const preview = () => f.request("/api/stocks/preview?market=A&code=601318", "GET", undefined, cookie);
+  const preview = () => f.request("/api/stocks/preview?market=A&code=601318&dividends=force", "GET", undefined, cookie);
   const full = await (await preview()).json();
   assert.equal(full.quote.price, 20); assert.equal(full.dividends.annual_dividend, 2.7); assert.deepEqual(full.errors, []);
   f.source.fetchDividends = async () => { throw new Error("upstream failure"); };
@@ -373,15 +373,15 @@ test("global refresh updates dividends even if quotes fail; later dividend failu
   const { id } = await (await f.request("/api/stocks", "POST", { name: "中国平安", code: "601318", market: "A", sector: "保险", price: 50 }, cookie)).json();
   f.source.fetchQuotes = async () => { throw new Error("quote offline"); };
   f.source.fetchDividends = async () => structuredClone(DIVIDEND);
-  const dividendOnly = await f.request("/api/refresh", "POST", {}, cookie); assert.equal(dividendOnly.status, 200);
+  const dividendOnly = await f.request("/api/refresh?dividends=force", "POST", {}, cookie); assert.equal(dividendOnly.status, 200);
   assert.equal((await dividendOnly.json()).dividends_updated, 1);
   const read = async () => (await f.request(`/api/stocks/${id}`, "GET", undefined, cookie)).json();
   const saved = await read(); assert.equal(saved.price, 50); assert.equal(saved.annual_dividend, 2.7); assert.equal(saved.dividend_yield, 2.7 / 50);
   f.source.fetchDividends = async () => { throw new Error("report offline"); };
-  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
+  assert.equal((await f.request("/api/refresh?dividends=force", "POST", {}, cookie)).status, 502);
   assert.deepEqual(await read(), saved);
   f.source.fetchQuotes = async () => ({ quotes: new Map([[id, { price: 60, quote_date: "2026-10-28" }]]), errors: [] });
-  const quoteOnly = await f.request("/api/refresh", "POST", {}, cookie); assert.equal(quoteOnly.status, 200);
+  const quoteOnly = await f.request("/api/refresh?dividends=force", "POST", {}, cookie); assert.equal(quoteOnly.status, 200);
   const result = await quoteOnly.json(); assert.equal(result.quotes_updated, 1); assert.equal(result.dividends_updated, 0); assert.match(result.errors.join(""), /保留原股息/);
   const detail = await read(); assert.equal(detail.price, 60); assert.equal(detail.annual_year, 2025); assert.deepEqual(detail.dividends, saved.dividends);
 });
@@ -394,20 +394,20 @@ test("refresh preserves concurrent manual dividends, price, watch and grid edits
     const edit = await f.request(`/api/stocks/${id}`, "PATCH", { annual_dividend: 3, price: 70, watched: true, grid_end: 0.09 }, cookie); assert.equal(edit.status, 200);
     return structuredClone(DIVIDEND);
   };
-  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
+  assert.equal((await f.request("/api/refresh?dividends=force", "POST", {}, cookie)).status, 502);
   let detail = await (await f.request(`/api/stocks/${id}`, "GET", undefined, cookie)).json();
   assert.equal(detail.annual_dividend, 3); assert.equal(detail.price, 70); assert.equal(detail.watched, true); assert.equal(detail.grid_end, 0.09);
   assert.equal((await (await f.request("/api/stocks", "GET", undefined, cookie)).json()).meta.last_refresh, null);
   f.source.fetchDividends = async () => {
     await f.request(`/api/stocks/${id}`, "PATCH", { grid_end: 0.1, watched: false }, cookie); return structuredClone(DIVIDEND);
   };
-  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 200);
+  assert.equal((await f.request("/api/refresh?dividends=force", "POST", {}, cookie)).status, 200);
   detail = await (await f.request(`/api/stocks/${id}`, "GET", undefined, cookie)).json();
   assert.equal(detail.annual_dividend, 2.7); assert.equal(detail.price, 20); assert.equal(detail.grid_end, 0.1); assert.equal(detail.watched, false);
   f.source.fetchDividends = async () => {
     await f.request(`/api/stocks/${id}`, "PATCH", { code: "600036" }, cookie); return structuredClone(DIVIDEND);
   };
-  assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
+  assert.equal((await f.request("/api/refresh?dividends=force", "POST", {}, cookie)).status, 502);
   detail = await (await f.request(`/api/stocks/${id}`, "GET", undefined, cookie)).json();
   assert.equal(detail.code, "600036"); assert.equal(detail.annual_dividend, null); assert.equal(detail.price, null);
 });
@@ -607,12 +607,12 @@ test("portfolio dividend continuation persists across handlers, ignores single r
     method: "POST", headers: { "Content-Type": "application/json", Cookie: alice.cookie }, body: "{}",
   }), f.env);
   assert.equal(response.status, 200);
-  assert.deepEqual(calls.slice(0, 4), ["600009", "600010", "600011", "600012"]);
+  assert.deepEqual(calls, ["600009", "600010", "600011"]); // The last stock is already cached.
   for (const id of ids.slice(8)) assert.equal((await (await f.request(`/api/stocks/${id}`, "GET", undefined, alice.cookie)).json()).annual_dividend, 2.7);
   assert.equal((await (await f.request(`/api/stocks/${bobStock.id}`, "GET", undefined, bob.cookie)).json()).annual_dividend, null);
   calls = [];
   assert.equal((await f.request("/api/refresh", "POST", {}, bob.cookie)).status, 200);
-  assert.deepEqual(calls, ["600001"]);
+  assert.deepEqual(calls, []); // Bob reuses Alice's public snapshot, never her personal row.
 });
 
 test("failed dividend batches advance only the owner's continuation without changing stock data or refresh dates", async t => {
@@ -639,4 +639,54 @@ test("failed dividend batches advance only the owner's continuation without chan
   calls = [];
   assert.equal((await f.request("/api/refresh", "POST", {}, cookie)).status, 502);
   assert.equal(calls[0], "600005");
+});
+
+
+test("daily dividends are shared across accounts while quotes display first and private settings remain isolated", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  const alice = await f.register(), bob = await f.register("bob-cache@example.test");
+  const add = async (cookie: string, sector: string, target_yield: number, annual_dividend: number) =>
+    (await f.request("/api/stocks", "POST", { code: "562060", market: "A", instrument_type: "etf", exchange: "sh", name: "ETF", sector, target_yield, annual_dividend }, cookie)).json();
+  const a = await add(alice.cookie, "Alice板块", 0.05, 999), b = await add(bob.cookie, "Bob板块", 0.08, 777);
+  await f.request(`/api/stocks/${a.id}`, "PATCH", { watched: true }, alice.cookie);
+  let calls = 0, started = () => {}, release = () => {};
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  f.source.fetchDividends = async identity => {
+    calls++; assert.equal(identity.code, "562060"); assert.equal(identity.annual_dividend, null);
+    assert.equal(identity.sector, "未分类"); assert.equal(identity.watched, false);
+    started(); await gate; return structuredClone(DIVIDEND);
+  };
+  assert.equal((await f.request(`/api/stocks/${a.id}/refresh?phase=quotes`, "POST", {}, alice.cookie)).status, 200);
+  assert.equal((await f.request(`/api/stocks/${b.id}/refresh?phase=quotes`, "POST", {}, bob.cookie)).status, 200);
+  assert.equal(calls, 0);
+  const read = async (id: number, cookie: string) => (await f.request(`/api/stocks/${id}`, "GET", undefined, cookie)).json();
+  assert.equal((await read(a.id, alice.cookie)).price, 20);
+  const first = f.request(`/api/stocks/${a.id}/refresh?phase=dividends`, "POST", {}, alice.cookie);
+  try {
+    await ready;
+    const pending = await f.request(`/api/stocks/${b.id}/refresh?phase=dividends`, "POST", {}, bob.cookie);
+    assert.equal(pending.status, 502); assert.match(JSON.stringify(await pending.json()), /正在更新/);
+    assert.equal((await read(b.id, bob.cookie)).annual_dividend, 777);
+    release(); assert.equal((await first).status, 200);
+    const cached = await f.request(`/api/stocks/${b.id}/refresh?phase=dividends`, "POST", {}, bob.cookie);
+    assert.equal(cached.status, 200); assert.equal((await cached.json()).dividends_cached, 1); assert.equal(calls, 1);
+    const aliceStock = await read(a.id, alice.cookie), bobStock = await read(b.id, bob.cookie);
+    assert.equal(aliceStock.annual_dividend, 2.7); assert.equal(bobStock.annual_dividend, 2.7);
+    assert.equal(aliceStock.sector, "Alice板块"); assert.equal(bobStock.sector, "Bob板块");
+    assert.equal(aliceStock.watched, true); assert.equal(bobStock.watched, false);
+    assert.equal(aliceStock.target_yield, 0.05); assert.equal(bobStock.target_yield, 0.08);
+    const preview = await f.request("/api/stocks/preview?code=562060&market=A&instrument_type=etf&exchange=sh", "GET", undefined, bob.cookie);
+    assert.equal((await preview.json()).dividends.annual_dividend, 2.7); assert.equal(calls, 1);
+    await f.request(`/api/stocks/${a.id}`, "PATCH", { annual_dividend: 123 }, alice.cookie);
+    await f.request(`/api/stocks/${b.id}/refresh?phase=dividends`, "POST", {}, bob.cookie);
+    assert.equal((await read(a.id, alice.cookie)).annual_dividend, 123);
+    assert.equal((await read(b.id, bob.cookie)).annual_dividend, 2.7);
+    assert.equal(f.db.sqlite.prepare("SELECT count(*) AS n FROM public_dividend_cache").get()!.n, 1);
+    const stored = JSON.parse(f.db.sqlite.prepare("SELECT snapshot FROM public_dividend_cache").get()!.snapshot as string);
+    assert.equal(stored.annual_dividend, 2.7);
+    for (const key of ["user_id", "sector", "watched", "target_yield", "price", "history"]) assert.ok(!(key in stored), key);
+    assert.equal((await f.request(`/api/stocks/${a.id}/refresh?phase=dividends`, "POST", {}, bob.cookie)).status, 404);
+    assert.equal((await f.request("/api/refresh?phase=invalid", "POST", {}, alice.cookie)).status, 400);
+  } finally { release(); await first; }
 });
