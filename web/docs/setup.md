@@ -6,6 +6,22 @@ Windows、Linux 和 WSL 统一使用 `npm run build` 构建 webpack 静态页面
 
 线上服务地址：[DiviWish · 息望](https://diviwish.shaunko.tech)。生产配置、数据库迁移与回退见[发布指南](cloudflare-deployment.md)。
 
+## 一键安装、构建和启动
+
+先安装包含 npm 的 Node.js 24+。网站入口都在 `web/`，不要运行根目录的 Excel 启动器。
+
+- **Windows**：双击 `web/run.cmd`。
+- **Linux / WSL**：进入 `web/` 后运行 `./run.sh`（也可用 `sh run.sh`）。
+- **两个系统的通用命令**：在 `web/` 运行 `npm run launch`。
+
+首次运行自动用 `npm ci` 安装锁文件对应的依赖、执行统一 webpack 静态构建，然后启动网页与 API。打开终端显示的地址，默认 [http://localhost:3000/discovery](http://localhost:3000/discovery)。按 `Ctrl+C` 停止。
+
+以后运行会复用未变化的依赖与静态页面；依赖锁文件或平台改变时重新安装，前端源码、构建配置或环境文件改变时重新构建。端口被占用或当前工作目录已有启动器运行时会说明原因并停止，不终止现有进程。安装或构建失败时不继续启动。
+
+只想完成安装和构建：Windows 双击 `setup.cmd`，Linux 运行 `./setup.sh`，或两边都运行 `npm run setup`。开发热更新使用下方的 `npm run dev`，一键脚本默认启动构建后的单进程预览。强制重建及依赖修复选项见[启动器说明](launcher.md)。
+
+现有 `.env.local`、多人版 `.dev.vars` 和数据库不会被启动器覆盖；首次多人本地运行会沿用服务原有的初始化逻辑创建缺少的账号配置。Windows 与 Linux 继续各自使用原生依赖，推荐使用独立工作副本。
+
 ## 本地启动
 
 需要 Node.js 24+。所有命令从 `web/` 运行：
@@ -15,7 +31,7 @@ npm ci
 npm run dev
 ```
 
-Windows 可双击 `setup.cmd` 安装，再双击 `run.cmd`。开发界面在 http://localhost:3000/discovery，后端在 8787。若已有服务占用端口，可在另一个终端运行 `WEB_PORT=3100 npm start`（Windows PowerShell：`$env:WEB_PORT=3100; npm start`）。`npm start` 预览已构建的静态页面，需要先 `npm run build`。
+上述命令启动开发模式；一键脚本则启动构建后的预览。开发界面在 http://localhost:3000/discovery，后端在 8787。若已有服务占用端口，可在另一个终端运行 `WEB_PORT=3100 npm start`（Windows PowerShell：`$env:WEB_PORT=3100; npm start`）。`npm start` 预览已构建的静态页面，需要先 `npm run build`。
 
 本地使用 Node.js 运行与 Worker 相同的 TypeScript 请求处理器，使用真实 SQLite 实现 D1 prepared statement / batch 接口。数据文件为 `.local/accounts/diviwish.sqlite3`。Cloudflare 上使用原生 D1 绑定；本地 HTTP 测试不等于原生 workerd 运行时验证。
 
@@ -54,7 +70,9 @@ Windows 可双击 `setup.cmd` 安装，再双击 `run.cmd`。开发界面在 htt
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | Next.js + Node 本地账号 API |
+| `npm run launch` | 一键检查／安装依赖、构建并启动本地账号版 |
+| `npm run setup` | 检查／安装依赖并构建，不启动 |
+| `npm run dev` | Next.js + Node 本地账号 API（热更新） |
 | `npm run backend` | 只启动本地账号 API |
 | `npm run db:migrate:local` | 只迁移新的本地账号库 |
 | `npm run build` | 导出静态页面到 out/ |

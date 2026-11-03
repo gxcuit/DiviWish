@@ -18,7 +18,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `src/app/` 为路由，`src/features/dividends/` 为股息业务（`components/`、`api.ts`、`types.ts`），`src/components/ui/` 为通用界面组件，`src/lib/` 为公共工具。
 - `worker/index.ts` 是当前后端入口；`src/features/auth/` 是账号界面。`worker/legacy.ts` 和 `backend/` 保留旧单人实现。`docs/` 保存网站文档。
 - 保留 backend/data/ 的 SQLite、备份和 seed 以及 .wrangler/state/；本地账号库只使用 .local/accounts/，检查与测试只使用临时数据库。
-- 在本目录运行 `npm run dev` 同时启动前后端；Windows 也可运行 `run.cmd`。
+- 一键启动：Windows `run.cmd`，Linux `./run.sh`，或通用 `npm run launch`；自动检查／安装依赖、webpack 构建并启动预览。`setup.cmd` / `setup.sh` 只安装和构建；开发热更新显式用 `npm run dev`。
 - 检查：`npm run check`；后端测试：`npm test`；本地 HTTP 检查：`npm run test:runtime`。不要用测试库覆盖个人数据。
 - 密钥只放被忽略的 .dev.vars；临时 Resend Full access 密钥只放 .local/resend-setup.env，不提供给应用。
 - 用户已授权部署账号版到现有 Cloudflare Worker `diviwish`；生产操作明确使用 `--env production`，账号库独立于原 `diviwish` D1。dry-run 仅打包。所有私人数据访问必须从会话获取 user_id 并在 SQL 中过滤。
