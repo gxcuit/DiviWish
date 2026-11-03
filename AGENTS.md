@@ -3,8 +3,8 @@
 - 所有股息率网站的开发与维护统一在 `web/` 进行，包括前端、Flask 后端、数据库和网站文档。
 - 网站源码、依赖、启动器和文档均在本项目的 `web/` 维护，不依赖相邻项目。
 - 根目录的 `scripts/`、`data/`、`pictures/` 和 `run.cmd` / `run.sh` 属于 Excel 股息跟踪流程；网站启动器位于 `web/run.cmd`。
-- 网站开发与检查命令从 `web/` 运行，详见 `web/README.md`。迁移、清理和检查时保留 `web/backend/data/` 中的 SQLite、备份和初始快照。
-- 根 README 展示网站功能与截图；Excel 操作说明位于 `docs/excel-workflow.md`。
+- 网站开发与检查命令从 `web/` 运行，详见 `web/docs/setup.md`。迁移、清理和检查时保留 `web/backend/data/` 中的 SQLite、备份和初始快照。
+- 根 README 与 `web/README.md` 展示用户功能、版本变化与截图，分支及设计维护说明放入 `web/docs/`；Excel 操作说明位于 `docs/excel-workflow.md`。
 
 ## 版本维护记忆
 

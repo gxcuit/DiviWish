@@ -19,9 +19,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 默认数据库只使用 `.local/standalone/diviwish.sqlite3`，可通过 `DIVIDEND_DATABASE` 指定独立文件；不得自动读取或覆盖 `.local/accounts/`、`backend/data/` 或 `.wrangler/state/`。
 - 保留 `backend/data/` 的 SQLite、备份和初始快照；测试只使用内存或临时数据库。
 - 从本目录运行 `npm run dev`；构建运行用 `npm run build`、`npm start`。Windows 可用 `run.cmd`。Docker 用 `docker compose up -d --build`。
-- 检查：`npm run check`；部署与配置说明见 `README.md`。Docker 数据目录必须挂载持久卷。
+- 检查：`npm run check`；部署与配置说明见 `docs/setup.md`。Docker 数据目录必须挂载持久卷。
 - 单机版无访问账号，默认仅监听本机，不执行线上发布。可信局域网或反向代理访问需显式配置 `APP_ORIGIN`。
 - 使用 2 空格缩进、具名导出、严格类型，延续现有样式与计算口径。
 - 根目录 Excel 脚本和工作簿独立维护，不自动运行或导入。
 
 - 版本归属及双端同步规则见 [项目记忆](../MEMORY.md)：唯一仓库为 `gxcuit/DiviWish`；单机版用 `main` / `codex/standalone`，多人版用 `multi-user` / `develop`；通用功能与 bug 修复两版同步，停用原私有仓库。
+
+- README 面向用户，说明功能、更新、使用入口与截图；分支、架构、开发和部署说明放在 `docs/`，技术命令见 `docs/setup.md`，目录见 `docs/index.md`。
