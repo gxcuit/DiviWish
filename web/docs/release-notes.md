@@ -1,5 +1,11 @@
 # 功能更新记录
 
+## 2026-11-03：Windows 与 Linux 一键启动
+
+- 两版均支持 Windows `run.cmd`、Linux `run.sh` 自动安装依赖、webpack 构建并启动；后续复用未变化的依赖和页面。
+- `setup.cmd` / `setup.sh` 只安装和构建，开发热更新仍使用 `npm run dev`。
+- 增加端口与重复启动检查，失败后停止，保留已有配置和数据库；详见 [启动器说明](launcher.md)。
+
 ## 2026-11-03：统一 Windows 与 Linux 构建
 
 - 默认构建、显式 `build:webpack` 入口和完整检查均使用相同 webpack 静态导出脚本，单机 Docker 沿用该入口。

@@ -19,6 +19,8 @@
     "dev": "node --env-file-if-exists=.env.local scripts/dev.mjs",
     "dev:web": "next dev --hostname 127.0.0.1",
     "backend": "node --env-file-if-exists=.env.local scripts/backend.mjs",
+    "launch": "node scripts/launch.mjs",
+    "setup": "node scripts/launch.mjs --prepare",
     "build": "node scripts/build.mjs",
     "build:webpack": "node scripts/build.mjs",
     "start": "node --env-file-if-exists=.env.local scripts/preview.mjs",

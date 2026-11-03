@@ -4,6 +4,22 @@
 
 Windows、Linux 和 WSL 统一使用 `npm run build` 构建 webpack 静态页面；也可显式运行 `npm run build:webpack`。`npm run check` 的构建阶段调用相同入口，单机 Docker 也沿用此入口。依赖必须在各自操作系统内用 `npm ci` 安装，详见[跨平台构建说明](build.md)；本机 WSL 的 Node 路径及启动排查见[WSL 记录](local-wsl.md)。
 
+## 一键安装、构建和启动
+
+先安装包含 npm 的 Node.js 24+。网站入口都在 `web/`，不要运行根目录的 Excel 启动器。
+
+- **Windows**：双击 `web/run.cmd`。
+- **Linux / WSL**：进入 `web/` 后运行 `./run.sh`（也可用 `sh run.sh`）。
+- **两个系统的通用命令**：在 `web/` 运行 `npm run launch`。
+
+首次运行自动用 `npm ci` 安装锁文件对应的依赖、执行统一 webpack 静态构建，然后启动网页与 API。打开终端显示的地址，默认 [http://localhost:3000/discovery](http://localhost:3000/discovery)。按 `Ctrl+C` 停止。
+
+以后运行会复用未变化的依赖与静态页面；依赖锁文件或平台改变时重新安装，前端源码、构建配置或环境文件改变时重新构建。端口被占用或当前工作目录已有启动器运行时会说明原因并停止，不终止现有进程。安装或构建失败时不继续启动。
+
+只想完成安装和构建：Windows 双击 `setup.cmd`，Linux 运行 `./setup.sh`，或两边都运行 `npm run setup`。开发热更新使用下方的 `npm run dev`，一键脚本默认启动构建后的单进程预览。强制重建及依赖修复选项见[启动器说明](launcher.md)。
+
+现有 `.env.local`、多人版 `.dev.vars` 和数据库不会被启动器覆盖；首次多人本地运行会沿用服务原有的初始化逻辑创建缺少的账号配置。Windows 与 Linux 继续各自使用原生依赖，推荐使用独立工作副本。
+
 ## npm 安装与使用
 
 安装 Node.js 24+（包含 npm），然后从仓库根目录进入网站目录：
@@ -23,7 +39,7 @@ npm start
 npm run dev
 ```
 
-开发模式同时启动 Next.js（3000）和 Node API（8787），支持页面热更新。开发与构建后运行使用同一单机数据库。Windows 可先双击 `web/setup.cmd` 安装，再双击 `web/run.cmd` 启动开发模式。
+开发模式同时启动 Next.js（3000）和 Node API（8787），支持页面热更新。开发与构建后运行使用同一单机数据库。Windows / Linux 的一键入口启动构建后的页面；需要开发热更新时显式运行 `npm run dev`。
 
 首次运行自动创建 `.local/standalone/diviwish.sqlite3`，默认包含招商银行（600036）与红利ETF华泰柏瑞（510880），并提供“未分类”“银行”“ETF”板块；默认标的不预填行情和分红。在“发现”中添加股票，输入代码或名称，获取价格与股息并核对后保存；点击星标加入自选。点击股票可查看详情、调整股息率口径和网格；“我的”可管理数据及刷新行情。关闭或更换浏览器不会丢失已保存数据。
 

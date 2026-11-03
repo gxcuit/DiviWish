@@ -18,7 +18,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `src/app/` 是页面路由，`src/features/dividends/` 是业务界面，`worker/` 保留历史目录名并由本地 Node 执行。`backend/` 保留 Flask 历史实现。
 - 默认数据库只使用 `.local/standalone/diviwish.sqlite3`，可通过 `DIVIDEND_DATABASE` 指定独立文件；不得自动读取或覆盖 `.local/accounts/`、`backend/data/` 或 `.wrangler/state/`。
 - 保留 `backend/data/` 的 SQLite、备份和初始快照；测试只使用内存或临时数据库。
-- 从本目录运行 `npm run dev`；构建运行用 `npm run build`、`npm start`。Windows 可用 `run.cmd`。Docker 用 `docker compose up -d --build`。
+- 一键启动：Windows `run.cmd`，Linux `./run.sh`，或通用 `npm run launch`；自动检查／安装依赖、webpack 构建并启动预览。`setup.cmd` / `setup.sh` 只安装和构建。开发热更新用 `npm run dev`；手动构建运行仍可用 `npm run build`、`npm start`。Docker 用 `docker compose up -d --build`。
 - 检查：`npm run check`；部署与配置说明见 `docs/setup.md`。Docker 数据目录必须挂载持久卷。
 - 单机版无访问账号，默认仅监听本机，不执行线上发布。可信局域网或反向代理访问需显式配置 `APP_ORIGIN`。
 - 使用 2 空格缩进、具名导出、严格类型，延续现有样式与计算口径。

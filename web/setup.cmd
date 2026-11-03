@@ -1,11 +1,13 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+chcp 65001 >nul
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Node.js 24 or newer is required.
+  echo Node.js 24 or newer with npm is required: https://nodejs.org/
+  if not defined CI pause
   exit /b 1
 )
-call npm ci
-if errorlevel 1 exit /b 1
-echo Setup complete. Run run.cmd for the standalone app.
+node "%~dp0scripts\launch.mjs" --prepare %*
+set "DIVIWISH_EXIT=%errorlevel%"
+if not "%DIVIWISH_EXIT%"=="0" if not defined CI pause
+exit /b %DIVIWISH_EXIT%

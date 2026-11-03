@@ -2,6 +2,8 @@
 
 Windows 原生 Node、Linux 和 WSL 使用相同的构建代码、入口及输出格式。开发服务与生产构建仍是不同用途：`npm run dev` 提供热更新，`npm start` 提供已构建页面和 API。
 
+一键安装、构建和启动也可使用 Windows 的 `run.cmd`、Linux 的 `./run.sh` 或通用的 `npm run launch`；详见[启动器说明](launcher.md)。
+
 ## 统一命令
 
 安装 Node.js 24+（包含 npm），在当前版本的 `web/` 目录运行。下面这些命令在 PowerShell、cmd 和 Linux shell 中相同：
