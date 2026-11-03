@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createHandler } from "../index.ts";
 import { digest, normalizeEmail } from "../auth.ts";
+import { parseSearch } from "../providers.ts";
 import type { OtpMessage } from "../mail.ts";
 import { sendResendOtp } from "../mail.ts";
 import { HttpError } from "../http.ts";
@@ -49,6 +50,26 @@ function accountFixture() {
   }
   return { db, emails, state, env, source, request, code, register, handler };
 }
+
+test("signed-in users can find and save 513530 from its real QDII-ETF classification", async t => {
+  const f = accountFixture(); t.after(() => f.db.sqlite.close());
+  f.source.searchStocks = async () => parseSearch('v_hint=' + JSON.stringify("sh~513530~港股通红利ETF华泰柏瑞~ggthletfhtbr~QDII-ETF"));
+  assert.equal((await f.request("/api/stocks/search?q=513530")).status, 401);
+  const alice = await f.register();
+  const response = await f.request("/api/stocks/search?q=513530", "GET", undefined, alice.cookie);
+  assert.equal(response.status, 200);
+  const { suggestions } = await response.json();
+  assert.equal(suggestions.length, 1); assert.equal(suggestions[0].existing, false);
+  const { name, code, market, instrument_type, exchange } = suggestions[0];
+  const saved = await f.request("/api/stocks", "POST", { name, code, market, instrument_type, exchange, sector: "ETF" }, alice.cookie);
+  assert.equal(saved.status, 201);
+  const stock = await saved.json();
+  assert.equal(stock.name, "港股通红利ETF华泰柏瑞"); assert.equal(stock.code, "513530");
+  assert.equal(stock.market, "A"); assert.equal(stock.instrument_type, "etf"); assert.equal(stock.exchange, "sh");
+  assert.equal(stock.yield_basis, "rolling");
+  const again = await (await f.request("/api/stocks/search?q=513530", "GET", undefined, alice.cookie)).json();
+  assert.equal(again.suggestions.length, 1); assert.equal(again.suggestions[0].existing, true);
+});
 
 test("registration requires a password and email verification; login uses the saved password without sending email", async t => {
   const f = accountFixture(); t.after(() => f.db.sqlite.close());

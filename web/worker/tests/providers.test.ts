@@ -11,6 +11,20 @@ test("Tencent search filters unsupported securities, decodes JSON escapes and ke
   assert.deepEqual(parseSearch('v_hint="N"'), []); assert.throws(() => parseSearch("unexpected"));
 });
 
+// Tencent's public response for 513530 on 2026-11-03 uses QDII-ETF, not ETF.
+const qdiiSearch = 'v_hint=' + JSON.stringify("sh~513530~港股通红利ETF华泰柏瑞~ggthletfhtbr~QDII-ETF^sh~513110~纳指ETF华泰柏瑞~nzetfhtbr~QDII-ETF");
+test("QDII-ETF results keep their domestic listing identity without admitting other funds or offshore listings", () => {
+  assert.deepEqual(parseSearch(qdiiSearch), [
+    { name: "港股通红利ETF华泰柏瑞", code: "513530", market: "A", instrument_type: "etf", exchange: "sh" },
+    { name: "纳指ETF华泰柏瑞", code: "513110", market: "A", instrument_type: "etf", exchange: "sh" },
+  ]);
+  for (const content of ["jj~018387~港股通红利ETF联接A~a~QDII", "sh~501300~跨境LOF~a~QDII-LOF",
+    "hk~02800~盈富ETF~a~QDII-ETF", "us~SPY~SPDR ETF~a~QDII-ETF", "sh~513530~基金~a~QDII-ETF",
+    "sh~513530~港股通红利ETF~a~QDII", "sz~513530~港股通红利ETF~a~QDII-ETF"])
+    assert.deepEqual(parseSearch('v_hint=' + JSON.stringify(content)), []);
+});
+
+
 test("quotes require valid provider trade dates and prices; timestamps and symbols retain market identity", () => {
   assert.equal(quoteDate("20261020153000"), "2026-10-20"); assert.equal(quoteDate("2026/10/20 16:00:00"), "2026-10-20");
   assert.equal(quoteDate("20260230000000"), null); assert.equal(quoteDate("missing"), null);
