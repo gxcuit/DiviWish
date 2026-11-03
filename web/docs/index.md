@@ -11,6 +11,7 @@
 ## 安装与维护
 
 - [安装、配置、运行、备份与检查](setup.md)
+- [Windows、Linux 与 Docker 的统一构建](build.md)
 - [本机 WSL 构建与启动记录](local-wsl.md)
 - [应用架构与代码组织](architecture.md)
 - [版本选择与分支维护](branches.md)
