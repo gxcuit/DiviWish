@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseKline, parseQuotes, parseSearch, providers, quoteDate, symbolFor } from "../providers.ts";
-import { sampleStocks } from "./helpers.ts";
+import { fixture, sampleStocks } from "./helpers.ts";
 
 test("Tencent search filters unsupported securities, decodes JSON escapes and keeps leading code zeros", () => {
   const content = "sh~601088~中国神华~zgsh~GP-A^hk~01088~中国神华~zgsh~GP^us~csuay~中国神华~zgsh~GP^sh~601088~中国神华~zgsh~GP-A^sh~510300~基金~jj~ETF^sz~200002~万科B~wkb~GP-B";
@@ -9,6 +9,34 @@ test("Tencent search filters unsupported securities, decodes JSON escapes and ke
     { name: "中国神华", code: "601088", market: "A" }, { name: "中国神华", code: "01088", market: "HK" },
   ]);
   assert.deepEqual(parseSearch('v_hint="N"'), []); assert.throws(() => parseSearch("unexpected"));
+});
+
+// Tencent's public response for 513530 on 2026-11-03 uses QDII-ETF, not ETF.
+const qdiiSearch = 'v_hint=' + JSON.stringify("sh~513530~港股通红利ETF华泰柏瑞~ggthletfhtbr~QDII-ETF^sh~513110~纳指ETF华泰柏瑞~nzetfhtbr~QDII-ETF");
+test("QDII-ETF results keep their domestic listing identity without admitting other funds or offshore listings", () => {
+  assert.deepEqual(parseSearch(qdiiSearch), [
+    { name: "港股通红利ETF华泰柏瑞", code: "513530", market: "A", instrument_type: "etf", exchange: "sh" },
+    { name: "纳指ETF华泰柏瑞", code: "513110", market: "A", instrument_type: "etf", exchange: "sh" },
+  ]);
+  for (const content of ["jj~018387~港股通红利ETF联接A~a~QDII", "sh~501300~跨境LOF~a~QDII-LOF",
+    "hk~02800~盈富ETF~a~QDII-ETF", "us~SPY~SPDR ETF~a~QDII-ETF", "sh~513530~基金~a~QDII-ETF",
+    "sh~513530~港股通红利ETF~a~QDII", "sz~513530~港股通红利ETF~a~QDII-ETF"])
+    assert.deepEqual(parseSearch('v_hint=' + JSON.stringify(content)), []);
+});
+
+test("513530 search result can be saved as an SSE ETF with its returned name and rolling basis", async t => {
+  const f = fixture({ searchStocks: async () => parseSearch(qdiiSearch).slice(0, 1) });
+  t.after(() => f.db.sqlite.close());
+  const response = await f.request("/api/stocks/search?q=513530");
+  assert.equal(response.status, 200);
+  const { suggestions } = await response.json();
+  assert.equal(suggestions.length, 1); assert.equal(suggestions[0].existing, false);
+  const { name, code, market, instrument_type, exchange } = suggestions[0];
+  const saved = await f.request("/api/stocks", "POST", { name, code, market, instrument_type, exchange, sector: "ETF" });
+  assert.equal(saved.status, 201);
+  const stock = await saved.json();
+  assert.equal(stock.name, "港股通红利ETF华泰柏瑞"); assert.equal(stock.instrument_type, "etf");
+  assert.equal(stock.exchange, "sh"); assert.equal(stock.yield_basis, "rolling"); assert.equal(symbolFor(stock), "sh513530");
 });
 
 test("quotes require valid provider trade dates and prices; timestamps and symbols retain market identity", () => {

@@ -64,7 +64,7 @@ export function parseSearch(text: string): Suggestion[] {
   for (const entry of content.split("^")) {
     const [exchange, code, name, , kind] = entry.split("~");
     const market = exchange === "hk" ? "HK" : ["sh", "sz", "bj"].includes(exchange) ? "A" : null;
-    const isEtf = market === "A" && ["sh", "sz"].includes(exchange) && (kind === "ETF" || kind?.startsWith("JJ")) && /ETF/i.test(name) && (exchange === "sh" ? /^(51|52|56|58)\d{4}$/ : /^159\d{3}$/).test(code);
+    const isEtf = market === "A" && ["sh", "sz"].includes(exchange) && (kind === "ETF" || kind === "QDII-ETF" || kind?.startsWith("JJ")) && /ETF/i.test(name) && (exchange === "sh" ? /^(51|52|56|58)\d{4}$/ : /^159\d{3}$/).test(code);
     if (!market || !name?.trim() || (!isEtf && (!kind?.startsWith("GP") || (market === "A" && kind !== "GP-A")))) continue;
     if (!(market === "HK" ? /^[0-9]{5}$/ : /^[0-9]{6}$/).test(code)) continue;
     const identity = `${market}:${code}`;
