@@ -55,6 +55,8 @@ export interface StockRecord extends Record<string, unknown> {
   grid_start: number;
   grid_end: number;
   grid_step: number;
+  grid_sell_start: number;
+  grid_sell_end: number;
   yield_basis: "annual" | "rolling" | "custom";
   custom_yield: number | null;
 }

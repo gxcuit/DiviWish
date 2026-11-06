@@ -61,11 +61,14 @@ try {
   assert.equal(added.status, 201, await added.clone().text());
   assert.equal(added.headers.get("Set-Cookie"), null);
   const { id } = await added.json();
-  assert.equal((await request(`/api/stocks/${id}`, "PATCH", { watched: true, grid_end: 0.09 })).status, 200);
+  assert.equal((await request(`/api/stocks/${id}`, "PATCH", { watched: true, grid_end: 0.09, grid_sell_start: 0.06, grid_sell_end: 0.04 })).status, 200);
   assert.equal((await request("/api/sectors", "POST", { name: "空板块" })).status, 201);
   await service.close(); service = await startLocalServer(options);
   const stock = await (await request(`/api/stocks/${id}`)).json();
   assert.equal(stock.name, payload.name); assert.equal(stock.watched, true); assert.equal(stock.grid_end, 0.09);
+  assert.equal(stock.grid_sell_start, 0.06); assert.equal(stock.grid_sell_end, 0.04);
+  assert.deepEqual(stock.sell_yield_grid.map(row => row.yield), [0.06, 0.055, 0.05, 0.045, 0.04]);
+  assert.deepEqual(stock.sell_yield_grid.map(row => row.reached), [true, true, true, false, false]);
   assert.ok((await (await request("/api/sectors")).json()).sectors.some(sector => sector.name === "空板块"));
   // Container-style binding and a deliberately configured reverse-proxy origin.
   await service.close(); service = await startLocalServer({ ...options, host: "0.0.0.0", config: { APP_ORIGIN: "https://personal.example" } });

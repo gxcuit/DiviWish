@@ -49,6 +49,7 @@ test("basis, grid, zero custom rates and security edits preserve the established
   assert.equal((await (await f.request("/api/stocks/2")).json()).grid_start, 0.03);
   await f.request("/api/stocks/1", "PATCH", { yield_basis: "custom", custom_yield: 0.08 });
   detail = await (await f.request("/api/stocks/1")).json();
+  assert.equal(detail.quantile_30_yield, 0.08); assert.equal(detail.quantile_30_price, 10);
   assert.equal(detail.percentile, 1); assert.equal(detail.quantile_60_yield, 0.08); assert.equal(detail.quantile_60_price, 10);
   assert.ok(detail.percentile_history.every((row: { yield: number }) => row.yield === 0.08));
   response = await f.request("/api/stocks/1", "PATCH", { price: 20 });

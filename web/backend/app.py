@@ -140,6 +140,7 @@ def create_app(config=None):
         result.pop("a_price", None)
         if include_detail:
             result["yield_grid"] = yield_grid(stock, metadata().get("fx_rate"))
+            result["sell_yield_grid"] = yield_grid(stock, metadata().get("fx_rate"), "sell")
         if not include_detail:
             result.pop("dividends", None)
             result.pop("history", None)
@@ -193,6 +194,7 @@ def create_app(config=None):
             stock[field] = value.strip()
         stock["sector"] = sector_name(stock["sector"])
         grid_levels(stock)
+        grid_levels(stock, "sell")
         if not isinstance(stock["yield_basis"], str) or stock["yield_basis"] not in {"annual", "rolling", "custom"}:
             raise ValueError("股息率口径只能为年度、滚动年度或自定义")
         custom = stock.get("custom_yield")

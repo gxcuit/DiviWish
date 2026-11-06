@@ -10,7 +10,8 @@ class GridAndSectorTests(TestCase):
     tearDown = test_api.ApiTests.tearDown
 
     def test_each_stock_keeps_its_own_grid_after_restart(self):
-        settings = {"grid_start": 0.04, "grid_end": 0.06, "grid_step": 0.005}
+        settings = {"grid_start": 0.04, "grid_end": 0.06, "grid_step": 0.005,
+                    "grid_sell_start": 0.06, "grid_sell_end": 0.04}
         self.assertEqual(self.client.patch("/api/stocks/1", json=settings).status_code, 200)
         restarted = create_app(self.config).test_client()
         detail = restarted.get("/api/stocks/1").json
@@ -18,6 +19,8 @@ class GridAndSectorTests(TestCase):
         self.assertAlmostEqual(detail["yield_grid"][0]["price"], 12.5)
         self.assertTrue(detail["yield_grid"][0]["reached"])
         self.assertFalse(detail["yield_grid"][-1]["reached"])
+        self.assertEqual([row["yield"] for row in detail["sell_yield_grid"]], [0.06, 0.055, 0.05, 0.045, 0.04])
+        self.assertEqual([row["reached"] for row in detail["sell_yield_grid"]], [True, True, True, False, False])
         for key, value in GRID_DEFAULTS.items():
             self.assertEqual(restarted.get("/api/stocks/2").json[key], value)
 
@@ -25,7 +28,11 @@ class GridAndSectorTests(TestCase):
         before = self.client.get("/api/stocks/1").json
         for invalid in [{"grid_start": 0}, {"grid_end": 0.02}, {"grid_step": -0.01},
                         {"grid_step": 0.00001}, {"grid_start": True}, {"grid_end": "0.05"},
-                        {"grid_step": float("nan")}, {"grid_end": 1.1}]:
+                        {"grid_step": float("nan")}, {"grid_end": 1.1},
+                        {"grid_sell_start": 0}, {"grid_sell_end": None}, {"grid_sell_start": True},
+                        {"grid_sell_end": "0.02"}, {"grid_sell_start": 0.01}, {"grid_sell_end": 0.05},
+                        {"grid_sell_start": 1, "grid_sell_end": 0.001, "grid_step": 0.001,
+                         "grid_start": 0.03, "grid_end": 0.03}]:
             with self.subTest(invalid=invalid):
                 self.assertEqual(self.client.patch("/api/stocks/1", json=invalid).status_code, 400)
         self.assertEqual(self.client.get("/api/stocks/1").json, before)
@@ -37,6 +44,9 @@ class GridAndSectorTests(TestCase):
         self.assertIsNone(yield_grid(stock, None)[0]["price"])
         self.assertIsNone(yield_grid({**stock, "annual_dividend": None}, 0.8)[0]["reached"])
         self.assertEqual(grid_levels({"grid_start": 0.03, "grid_end": 0.05, "grid_step": 0.006}), [0.03, 0.036, 0.042, 0.048])
+        self.assertEqual(grid_levels({"grid_sell_start": 0.06, "grid_sell_end": 0.04, "grid_step": 0.006}, "sell"), [0.06, 0.054, 0.048, 0.042])
+        self.assertAlmostEqual(yield_grid(stock, 0.8, "sell")[0]["price"], 15.625)
+        self.assertIsNone(yield_grid(stock, None, "sell")[0]["reached"])
 
     def test_empty_sector_is_saved_and_stock_form_can_use_it(self):
         created = self.client.post("/api/sectors", json={"name": "新板块"})

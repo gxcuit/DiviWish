@@ -14,6 +14,7 @@ export function EtfHistory({ stock, state, onRetry }: { stock: StockDetail; stat
     <button className={styles.historyRetry} disabled={state?.loading} onClick={onRetry}>{state?.loading ? "计算中…" : "重新获取历史数据"}</button>
     {stock.percentile_unavailable_reason && <p className={styles.muted}>{stock.percentile_unavailable_reason}</p>}
     <div className={styles.detailMetrics}>
+      <div><span>30 分位{label} / 对应价格</span><strong>{rate(stock.quantile_30_yield)} / {price(stock.quantile_30_price)}</strong></div>
       <div><span>60 分位{label} / 对应价格</span><strong>{rate(stock.quantile_60_yield)} / {price(stock.quantile_60_price)}</strong></div>
       <div><span>90 分位{label} / 对应价格</span><strong>{rate(stock.quantile_90_yield)} / {price(stock.quantile_90_price)}</strong></div>
     </div>
