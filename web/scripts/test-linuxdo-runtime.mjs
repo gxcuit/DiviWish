@@ -57,7 +57,11 @@ try {
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
   assert.deepEqual(result, { runtime: "workerd", callback: true, session: true, portfolio: true, replayRejected: true, providerRedirectsRejected: true, dailyDividends: true });
-  console.log(`Native workerd OAuth (${testDate}; production ${appDate}) passed: callback, session, D1 portfolio, replay, provider redirects and daily public dividend cache/lease. Only temporary data and simulated provider responses used.`);
+  const forecastResponse = await fetch(`http://127.0.0.1:${port}/forecast`, { method: "POST", body: await readFile(path.join(root, "worker/tests/fixtures/forecast-runtime.pdf")), signal: AbortSignal.timeout(30_000) });
+  const forecast = await forecastResponse.json();
+  assert.equal(forecastResponse.status, 200, JSON.stringify(forecast));
+  assert.deepEqual(forecast, { pdf: true, html: true, forecastCache: true, documentCache: true, manualIsolation: true });
+  console.log(`Native workerd (${testDate}; production ${appDate}) passed: OAuth, D1 portfolio, dividend cache/lease, PDF/HTML forecast parsers, forecast/document caches and manual parameter isolation. Only temporary data and simulated provider responses used.`);
 } finally {
   if (child?.pid) {
     if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });

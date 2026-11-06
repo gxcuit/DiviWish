@@ -5,6 +5,8 @@ export function render(stock: StockRecord, records: StockRecord[], meta: Record<
   const prices = Object.fromEntries(records.filter(row => row.market === "A" && row.price).map(row => [row.code, row.price! ]));
   const result: Record<string, unknown> = derive(stock, meta.fx_rate, prices);
   delete result._refresh_id;
+  delete result.forecast_snapshot;
+  delete result.forecast_error;
   delete result.connect_factor;
   delete result.a_price;
   if (detail) {

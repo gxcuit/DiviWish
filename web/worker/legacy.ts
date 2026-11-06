@@ -1,3 +1,5 @@
+import { HttpError as SharedHttpError } from "./http.ts";
+import { forecastResponse } from "./forecast-service.ts";
 import type { D1Database } from "@cloudflare/workers-types";
 import { BollingerService } from "./bollinger.ts";
 import { getStock, initialize, metadata, rawStocks, render, saveStock, sectorRecords } from "./database.ts";
@@ -212,10 +214,12 @@ export function createHandler(source: Providers = providers) {
         const moved = results[1].meta.changes;
         return json({ message: `板块已删除，${moved} 支股票已保留到未分类`, moved });
       }
-      const stockMatch = path.match(/^\/api\/stocks\/(\d+)(\/boll)?$/);
-      if (stockMatch && ["GET", "PATCH", "DELETE"].includes(method)) {
+      const stockMatch = path.match(/^\/api\/stocks\/(\d+)(\/(?:boll|forecast))?$/);
+      if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await getStock(db, id);
         if (!stock) throw new HttpError(404, "股票不存在");
+        if (stockMatch[2] === "/forecast") return await forecastResponse(request, url, stock, { stock: id => getStock(db, id), stocks: () => rawStocks(db), meta: () => metadata(db), save: (value, previous) => saveStock(db, value, previous) }, db, source);
+        if (method === "POST") throw new HttpError(405, "不支持的请求方法");
         if (stockMatch[2]) {
           if (method !== "GET") throw new HttpError(405, "不支持的请求方法");
           return json(await bollinger.get(stock, source, url.searchParams.get("refresh") === "1"));
@@ -235,7 +239,7 @@ export function createHandler(source: Providers = providers) {
       }
       throw new HttpError(404, "接口不存在");
     } catch (error) {
-      if (error instanceof HttpError) return json({ error: error.message }, error.status);
+      if (error instanceof HttpError || error instanceof SharedHttpError) return json({ error: error.message }, error.status);
       if (error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
         return json({ error: new URL(request.url).pathname.startsWith("/api/sectors") ? "该板块已存在" : "该市场和股票代码已存在" }, 409);
       }

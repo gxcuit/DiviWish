@@ -1,3 +1,4 @@
+import type { ForecastManual, ForecastResult } from "../../../worker/forecast-types";
 export interface DividendPart {
   period: string;
   dps: number;
@@ -18,6 +19,8 @@ export interface StockPreview {
 }
 
 export interface Stock {
+  forecast?: ForecastResult;
+  forecast_manual?: ForecastManual | null;
   history_status?: "ready" | "not_applicable";
   history_version?: number;
   history_updated_at?: string;
@@ -106,7 +109,7 @@ export interface GridSettings {
   grid_sell_end: number;
 }
 
-export type YieldBasis = 'annual' | 'rolling' | 'custom';
+export type YieldBasis = 'annual' | 'rolling' | 'custom' | 'forecast';
 
 export interface YieldBasisSettings {
   yield_basis: YieldBasis;

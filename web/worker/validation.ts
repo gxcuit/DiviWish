@@ -1,3 +1,4 @@
+import { validateForecastManual } from "./forecast.ts";
 import { GRID_DEFAULTS, YIELD_DEFAULTS, gridLevels, number } from "./calculations.ts";
 import type { StockRecord } from "./types.ts";
 
@@ -10,7 +11,7 @@ export const DEFAULT_STOCK = {
   dividends: [], history: [], connect_factor: null,
 };
 const EDITABLE = new Set(["instrument_type", "exchange", "code", "name", "sector", "market", "price", "annual_dividend", "rolling_dividend", "target_yield",
-  "confirmed", "ex_dividend_date", "watched", "a_code", "year_start_price", ...Object.keys(GRID_DEFAULTS), ...Object.keys(YIELD_DEFAULTS)]);
+  "confirmed", "ex_dividend_date", "watched", "a_code", "year_start_price", ...Object.keys(GRID_DEFAULTS), ...Object.keys(YIELD_DEFAULTS), "forecast_manual"]);
 
 export function timestamp(): string {
   return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19) + "+08:00";
@@ -50,7 +51,9 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
   }
   gridLevels(stock);
   gridLevels(stock, "sell");
-  if (!["annual", "rolling", "custom"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度或自定义");
+  if (!["annual", "rolling", "custom", "forecast"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度、自定义或预估");
+  if ("forecast_manual" in input) stock.forecast_manual = validateForecastManual(input.forecast_manual);
+  if (stock.instrument_type === "etf" && (stock.yield_basis === "forecast" || "forecast_manual" in input && stock.forecast_manual)) throw new Error("ETF 不适用个股预估口径");
   if (stock.custom_yield !== null) {
     const custom = number(stock.custom_yield);
     if (custom === null || custom < 0 || custom > 1) throw new Error("自定义股息率须为 0% 至 100% 的有效数字");
@@ -90,6 +93,7 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     if (!("rolling_dividend" in input)) stock.rolling_dividend = null;
     if (!("confirmed" in input)) stock.confirmed = false;
     if (changed(["code", "market", "instrument_type", "exchange"])) {
+      delete stock.forecast_snapshot; delete stock.forecast_manual; delete stock.forecast_error;
       for (const field of ["price", "annual_dividend", "ex_dividend_date", "year_start_price", "a_code"] as const) {
         if (!(field in input)) stock[field] = null;
       }

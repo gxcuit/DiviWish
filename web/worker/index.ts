@@ -1,3 +1,4 @@
+import { forecastResponse } from "./forecast-service.ts";
 import { ensureEtfSector } from "./onboarding.ts";
 import { createLinuxdoAuth } from "./linuxdo.ts";
 import { createAuth, requireUser } from "./auth.ts";
@@ -106,10 +107,11 @@ export function createHandler(source: Providers = providers, authOptions: Parame
         ]);
         return json({ message: `板块已删除，${results[1].meta.changes} 支股票已保留到未分类`, moved: results[1].meta.changes });
       }
-      const stockMatch = path.match(/^\/api\/stocks\/(\d+)(\/(?:boll|refresh|history))?$/);
+      const stockMatch = path.match(/^\/api\/stocks\/(\d+)(\/(?:boll|refresh|history|forecast))?$/);
       if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await store.stock(id);
         if (!stock) throw new HttpError(404, "股票不存在");
+        if (stockMatch[2] === "/forecast") return await forecastResponse(request, url, stock, store, db, source);
         if (stockMatch[2] === "/history") {
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);

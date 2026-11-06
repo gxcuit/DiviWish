@@ -13,6 +13,7 @@ export class TestDatabase {
     this.sqlite = new DatabaseSync(filename);
     this.sqlite.exec(readFileSync(new URL("../../migrations/0001_initial.sql", import.meta.url), "utf8"));
     this.sqlite.exec(readFileSync(new URL("../../migrations/0005_public_dividends.sql", import.meta.url), "utf8"));
+    this.sqlite.exec(readFileSync(new URL("../../migrations/0006_forecasts.sql", import.meta.url), "utf8"));
   }
   prepare(sql: string) {
     const sqlite = this.sqlite;
