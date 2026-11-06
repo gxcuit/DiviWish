@@ -30,6 +30,8 @@ export interface Stock {
   grid_start: number;
   grid_end: number;
   grid_step: number;
+  grid_sell_start: number;
+  grid_sell_end: number;
   id: number;
   instrument_type?: 'stock' | 'etf';
   exchange?: 'sh' | 'sz' | 'bj' | 'hk' | null;
@@ -72,6 +74,8 @@ export interface Stock {
   percentile_start: string | null;
   percentile_end: string | null;
   percentile_count: number;
+  quantile_30_yield: number | null;
+  quantile_30_price: number | null;
   quantile_60_yield: number | null;
   quantile_60_price: number | null;
   quantile_90_yield: number | null;
@@ -89,6 +93,7 @@ export interface Stock {
 export interface StockDetail extends Stock {
   percentile_history: { date: string; yield: number; close: number; window_status?: "overlap" | "gap" | "no_cash" | "before_first" }[];
   yield_grid: { yield: number; price: number | null; reached: boolean | null }[];
+  sell_yield_grid: { yield: number; price: number | null; reached: boolean | null }[];
   dividends: DividendPart[];
   history: { date: string; yield: number; close: number }[];
 }
@@ -97,6 +102,8 @@ export interface GridSettings {
   grid_start: number;
   grid_end: number;
   grid_step: number;
+  grid_sell_start: number;
+  grid_sell_end: number;
 }
 
 export type YieldBasis = 'annual' | 'rolling' | 'custom';

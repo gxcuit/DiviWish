@@ -5,7 +5,8 @@ import math
 from decimal import Decimal
 
 MIN_HISTORY_SAMPLES = 60
-GRID_DEFAULTS = {"grid_start": 0.03, "grid_end": 0.08, "grid_step": 0.005}
+GRID_DEFAULTS = {"grid_start": 0.03, "grid_end": 0.08, "grid_step": 0.005,
+                 "grid_sell_start": 0.04, "grid_sell_end": 0.02}
 YIELD_DEFAULTS = {"yield_basis": "annual", "custom_yield": None}
 
 
@@ -23,27 +24,30 @@ def selected_basis(stock, fx_rate):
     return rate, cash
 
 
-def grid_levels(stock):
-    settings = {key: number(stock.get(key, default)) for key, default in GRID_DEFAULTS.items()}
+def grid_levels(stock, direction="buy"):
+    keys = ("grid_sell_start", "grid_sell_end", "grid_step") if direction == "sell" else ("grid_start", "grid_end", "grid_step")
+    settings = {key: number(stock.get(key, GRID_DEFAULTS[key])) for key in keys}
     if any(value is None or not 0 < value <= 1 for value in settings.values()):
         raise ValueError("网格起止股息率和步长须为 (0,100%] 内的有效数字")
-    start, end, step = (Decimal(str(settings[key])) for key in ("grid_start", "grid_end", "grid_step"))
-    if start > end:
-        raise ValueError("网格起始股息率不能大于结束股息率")
-    count = int((end - start) / step) + 1
+    start, end, step = (Decimal(str(settings[key])) for key in keys)
+    delta = start - end if direction == "sell" else end - start
+    if delta < 0:
+        raise ValueError("卖出起始股息率不能小于卖出结束股息率" if direction == "sell" else "买入起始股息率不能大于买入结束股息率")
+    count = int(delta / step) + 1
     if count > 201:
         raise ValueError("网格最多 201 档，请增大每格步长或缩小范围")
-    return [float(start + step * index) for index in range(count)]
+    return [float(start + (-step if direction == "sell" else step) * index) for index in range(count)]
 
 
-def yield_grid(stock, fx_rate):
+def yield_grid(stock, fx_rate, direction="buy"):
     _rate, dividend = selected_basis(stock, fx_rate)
     price = number(stock.get("price"))
     rows = []
-    for target in grid_levels(stock):
+    for target in grid_levels(stock, direction):
         target_price = dividend / target if dividend is not None else None
         rows.append({"yield": target, "price": target_price,
-                     "reached": price <= target_price if price is not None and target_price is not None else None})
+                     "reached": (price >= target_price if direction == "sell" else price <= target_price)
+                     if price is not None and target_price is not None else None})
     return rows
 
 
@@ -118,7 +122,7 @@ def derive(stock, fx_rate, a_prices=None):
     a_price = (a_prices or {}).get(stock.get("a_code")) or stock.get("a_price")
     if is_hk and a_price and valid:
         result["ah_premium"] = a_price / denominator - 1
-    for probability in (60, 90):
+    for probability in (30, 60, 90):
         quantile = values[math.ceil(probability / 100 * len(values)) - 1] if valid_history else None
         quantile_price = basis_dividend / quantile if basis_dividend is not None and quantile and quantile > 0 else None
         result[f"quantile_{probability}_yield"] = quantile

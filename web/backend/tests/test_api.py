@@ -39,6 +39,8 @@ class CalculationTests(unittest.TestCase):
         self.assertAlmostEqual(result["rolling_yield"], 0.06)
         self.assertAlmostEqual(result["target_price"], 10)
         self.assertAlmostEqual(result["percentile"], 0.75)
+        self.assertAlmostEqual(result["quantile_30_yield"], 0.03)
+        self.assertAlmostEqual(result["quantile_30_price"], 0.5 / 0.03)
         self.assertAlmostEqual(result["quantile_60_yield"], 0.05)
         self.assertAlmostEqual(result["quantile_90_price"], 0.5 / 0.06)
 
@@ -63,6 +65,8 @@ class CalculationTests(unittest.TestCase):
         stock["history"] = stock["history"][:59]
         result = derive(stock, 0.8)
         self.assertIsNone(result["percentile"])
+        self.assertIsNone(result["quantile_30_yield"])
+        self.assertIsNone(result["quantile_30_price"])
         self.assertIsNone(result["quantile_60_yield"])
         self.assertEqual(result["percentile_count"], 59)
 

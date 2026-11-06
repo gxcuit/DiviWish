@@ -7,7 +7,10 @@ export function render(stock: StockRecord, records: StockRecord[], meta: Record<
   delete result._refresh_id;
   delete result.connect_factor;
   delete result.a_price;
-  if (detail) result.yield_grid = yieldGrid(stock, meta.fx_rate);
+  if (detail) {
+    result.yield_grid = yieldGrid(stock, meta.fx_rate);
+    result.sell_yield_grid = yieldGrid(stock, meta.fx_rate, "sell");
+  }
   else { delete result.dividends; delete result.history; delete result.percentile_history; }
   return result;
 }

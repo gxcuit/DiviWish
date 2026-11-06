@@ -49,6 +49,7 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     stock.a_code = null;
   }
   gridLevels(stock);
+  gridLevels(stock, "sell");
   if (!["annual", "rolling", "custom"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度或自定义");
   if (stock.custom_yield !== null) {
     const custom = number(stock.custom_yield);

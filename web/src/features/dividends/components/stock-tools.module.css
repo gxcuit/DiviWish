@@ -4,6 +4,7 @@
 .basisInputs label { display: flex; flex-direction: column; flex: 1; min-width: 120px; gap: 6px; font-size: 12px; color: #737b88; }
 .basisInputs input, .basisInputs select { min-width: 0; width: 100%; padding: 9px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; color: #172033; font-size: 14px; }
 .heading { display: flex; gap: 7px; align-items: center; }
+.gridTitle { margin: 18px 0 6px; font-size: 13px; font-weight: 500; }
 .gridInputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .gridInputs label, .manager label { display: flex; flex-direction: column; gap: 6px; color: #737b88; font-size: 11px; }
 .gridInputs input, .manager input { min-width: 0; width: 100%; padding: 9px; color: #172033; font-size: 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }

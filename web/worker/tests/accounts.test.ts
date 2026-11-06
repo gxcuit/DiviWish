@@ -490,6 +490,7 @@ test("saved historical basis and upgraded caches remain isolated to the signed-i
   assert.equal((await (await f.request(`/api/stocks/${id}`, "GET", undefined, alice.cookie)).json()).percentile, null);
   assert.equal((await f.request(`/api/stocks/${id}/history`, "POST", {}, bob.cookie)).status, 404);
   const detail = await (await f.request(`/api/stocks/${id}/history`, "POST", {}, alice.cookie)).json();
+  assert.equal(detail.quantile_30_yield, 0.03); assert.equal(detail.quantile_30_price, 20);
   assert.equal(detail.percentile, 0.5); assert.equal(detail.quantile_60_yield, 0.09);
   assert.ok(detail.percentile_history.every((row: { yield: number }, i: number) => row.yield === history[i].rolling_yield));
   await f.request(`/api/stocks/${id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.08 }, alice.cookie);

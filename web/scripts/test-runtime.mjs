@@ -49,9 +49,17 @@ try {
   assert.equal((await request(`/api/stocks/${id}`, "GET", undefined, bob)).status, 404);
   assert.equal((await request(`/api/stocks/${id}`, "DELETE", undefined, bob)).status, 404);
   assert.deepEqual((await (await request("/api/stocks", "GET", undefined, bob)).json()).stocks.map(s => s.code), ["600036", "510880"]);
+  const grid = { grid_sell_start: 0.06, grid_sell_end: 0.04 };
+  assert.equal((await request(`/api/stocks/${id}`, "PATCH", grid, alice)).status, 200);
+  assert.equal((await request(`/api/stocks/${id}`, "PATCH", { grid_sell_start: 0.07 }, bob)).status, 404);
   // Restart against only this temporary database: sessions and account data persist.
   await service.close(); service = await startLocalServer(options);
   assert.equal((await (await request("/api/stocks", "GET", undefined, alice)).json()).stocks.length, 3);
+  const saved = await (await request(`/api/stocks/${id}`, "GET", undefined, alice)).json();
+  assert.equal(saved.grid_sell_start, grid.grid_sell_start); assert.equal(saved.grid_sell_end, grid.grid_sell_end);
+  assert.deepEqual(saved.sell_yield_grid.map(row => row.yield), [0.06, 0.055, 0.05, 0.045, 0.04]);
+  assert.deepEqual(saved.sell_yield_grid.map(row => row.reached), [true, true, true, false, false]);
+  assert.equal((await request(`/api/stocks/${id}`, "GET", undefined, bob)).status, 404);
   assert.equal((await request("/api/auth/logout", "POST", {}, alice)).status, 200);
   assert.equal((await request("/api/stocks", "GET", undefined, alice)).status, 401);
   const passwordLogin = await request("/api/auth/login", "POST", { email: "alice@example.test", password: "Local runtime test password 123!" });

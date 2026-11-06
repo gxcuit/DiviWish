@@ -1,7 +1,7 @@
 import { payoutMetrics } from "./financial-metrics.ts";
 import type { StockRecord } from "./types.ts";
 
-export const GRID_DEFAULTS = { grid_start: 0.03, grid_end: 0.08, grid_step: 0.005 };
+export const GRID_DEFAULTS = { grid_start: 0.03, grid_end: 0.08, grid_step: 0.005, grid_sell_start: 0.04, grid_sell_end: 0.02 };
 export const YIELD_DEFAULTS = { yield_basis: "annual" as const, custom_yield: null };
 
 export function number(value: unknown): number | null {
@@ -29,30 +29,31 @@ function decimalParts(value: number): [bigint, number] {
   return scale >= 0 ? [digits, scale] : [digits * 10n ** BigInt(-scale), 0];
 }
 
-export function gridLevels(stock: Partial<StockRecord>): number[] {
-  const values = Object.entries(GRID_DEFAULTS).map(([key, fallback]) =>
-    number(key in stock ? stock[key] : fallback));
+export function gridLevels(stock: Partial<StockRecord>, direction: "buy" | "sell" = "buy"): number[] {
+  const keys = direction === "sell" ? ["grid_sell_start", "grid_sell_end", "grid_step"] as const : ["grid_start", "grid_end", "grid_step"] as const;
+  const values = keys.map(key => number(key in stock ? stock[key] : GRID_DEFAULTS[key]));
   if (values.some(value => value === null || value <= 0 || value > 1)) {
     throw new Error("网格起止股息率和步长须为 (0,100%] 内的有效数字");
   }
   const parts = (values as number[]).map(decimalParts);
   const scale = Math.max(...parts.map(([, decimals]) => decimals));
   const [start, end, step] = parts.map(([digits, decimals]) => digits * 10n ** BigInt(scale - decimals));
-  if (start > end) throw new Error("网格起始股息率不能大于结束股息率");
-  const count = (end - start) / step + 1n;
+  const delta = direction === "sell" ? start - end : end - start;
+  if (delta < 0n) throw new Error(direction === "sell" ? "卖出起始股息率不能小于卖出结束股息率" : "买入起始股息率不能大于买入结束股息率");
+  const count = delta / step + 1n;
   if (count > 201n) throw new Error("网格最多 201 档，请增大每格步长或缩小范围");
   return Array.from({ length: Number(count) }, (_, index) => {
-    const digits = String(start + step * BigInt(index)).padStart(scale + 1, "0");
+    const digits = String(start + (direction === "sell" ? -step : step) * BigInt(index)).padStart(scale + 1, "0");
     return Number(scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits);
   });
 }
 
-export function yieldGrid(stock: StockRecord, fxRate: unknown) {
+export function yieldGrid(stock: StockRecord, fxRate: unknown, direction: "buy" | "sell" = "buy") {
   const [, dividend] = selectedBasis(stock, fxRate);
   const price = number(stock.price);
-  return gridLevels(stock).map(target => {
+  return gridLevels(stock, direction).map(target => {
     const targetPrice = dividend !== null ? dividend / target : null;
-    return { yield: target, price: targetPrice, reached: price !== null && targetPrice !== null ? price <= targetPrice : null };
+    return { yield: target, price: targetPrice, reached: price !== null && targetPrice !== null ? direction === "sell" ? price >= targetPrice : price <= targetPrice : null };
   });
 }
 
@@ -101,7 +102,7 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     const quantilePrice = basisDividend !== null && value && value > 0 ? basisDividend / value : null;
     return [value, quantilePrice];
   };
-  const [q60, p60] = quantile(60), [q90, p90] = quantile(90);
+  const [q30, p30] = quantile(30), [q60, p60] = quantile(60), [q90, p90] = quantile(90);
   return {
     ...stock,
     yield_basis: stock.yield_basis ?? "annual", custom_yield: stock.custom_yield ?? null,
@@ -120,6 +121,7 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     ah_premium: isHk && aPrice && valid ? aPrice / denominator - 1 : null,
     hk_net_yield: isHk && annualYield !== null ? annualYield * 0.9 : null,
     connect_yield: isHk && annualYield !== null && factor !== null ? annualYield * factor : null,
+    quantile_30_yield: q30, quantile_30_price: p30,
     quantile_60_yield: q60, quantile_60_price: p60,
     quantile_90_yield: q90, quantile_90_price: p90,
   };
