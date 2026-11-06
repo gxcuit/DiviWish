@@ -12,7 +12,7 @@ function publicSnapshot(snapshot: ForecastSnapshot): ForecastSnapshot {
 export async function dailyForecast(db: SqliteDatabase, stock: StockRecord, providers: Providers, force = false) {
   if (stock.instrument_type === "etf") throw new Error("ETF 不适用个股盈利分红预估");
   const year = forecastYear(), today = forecastToday(), now = Date.now();
-  const key = `v1:${stock.market}:${stock.code}:${year}`;
+  const key = `v2:${stock.market}:${stock.code}:${year}`;
   const read = () => db.prepare("SELECT snapshot,cache_day,lease_until,retry_after FROM public_forecast_cache WHERE cache_key=?").bind(key).first<Row>();
   const row = await read();
   const previous: ForecastSnapshot | null = row?.snapshot ? publicSnapshot(JSON.parse(row.snapshot)) : null;

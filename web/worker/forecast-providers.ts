@@ -7,7 +7,7 @@ import type { StockRecord } from "./types.ts";
 import { forecastToday } from "./forecast.ts";
 
 type Row = Record<string, unknown>;
-const day = (v: unknown) => typeof v === "string" && /^20\d{2}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : "";
+const day = (v: unknown) => typeof v === "string" && /^20\d{2}[-/]\d{2}[-/]\d{2}/.test(v) ? v.slice(0, 10).replaceAll("/", "-") : "";
 const currency = (v: unknown): ForecastCurrency | null => ["CNY", "HKD", "USD"].includes(String(v)) ? v as ForecastCurrency : null;
 
 export function parseForecastFinancials(rows: Row[], stock: StockRecord, url: string, today: string, nativeRows: Row[] = []): ForecastFinancial[] {
@@ -27,6 +27,22 @@ export function parseForecastFinancials(rows: Row[], stock: StockRecord, url: st
       profit: profit?.CURRENCY_CODE === c ? forecastNumber(profit.AMOUNT) : null,
       shares: forecastNumber(row.ISSUED_COMMON_SHARES), notice_date: notice, source: url }];
   }).sort((a, b) => b.period.localeCompare(a.period));
+}
+
+/** Balance amounts identify a need for reconciliation; they are never earnings deductions. */
+export function attachForecastBalance(financials: ForecastFinancial[], rows: Row[], stock: StockRecord, source: string, today: string) {
+  if (rows.some(r => String(r.SECURITY_CODE) !== stock.code)) throw new Error("资产负债表证券身份不匹配");
+  for (const financial of financials) {
+    const row = rows.find(r => day(r.REPORT_DATE) === financial.period && day(r.NOTICE_DATE) && day(r.NOTICE_DATE) <= today);
+    if (!row) { financial.equity_status = "unknown"; continue; }
+    const equity = [row.OTHER_EQUITY_TOOL, row.PREFERRED_SHARES, row.PERPETUAL_BOND].map(forecastNumber);
+    financial.equity_status = equity.some(n => n !== null && Math.abs(n) > 0) ? "present" : "none_reported";
+    financial.equity_balance = Math.max(...equity.map(n => Math.abs(n ?? 0)));
+    financial.treasury_balance = forecastNumber(row.TREASURY_SHARES);
+    financial.balance_source = source;
+    // SHARE_CAPITAL is a currency amount (and can be rounded). It is NOT a share count.
+  }
+  return financials;
 }
 
 export function parseForecastAConsensus(rows: Row[], stock: StockRecord, year: number, today: string, source: string): ForecastConsensus | null {
@@ -76,17 +92,17 @@ export function parseForecastDividends(rows: Row[], stock: StockRecord, source: 
     const notice = day(row.NOTICE_DATE ?? row.PLAN_NOTICE_DATE);
     if (!notice || notice > today) continue;
     const progress = String(row.ASSIGN_PROGRESS ?? ""), text = String(row.IMPL_PLAN_PROFILE ?? row.PLAN_EXPLAIN ?? "");
-    if (stock.market === "A" && !/实施分配|特别分配|不分配|不分红|董事会决议通过|股东大会决议通过|股东大会通过/.test(progress)) continue;
+
     const type = String(row.REPORT_TYPE ?? ""), y = String(row.YEAR ?? "");
     const suffix = /^(年度|末期|四季度|第四季度)分配$/.test(type) ? "12-31" : /^(中期|二季度|第二季度)分配$/.test(type) ? "06-30" : /^(一季度|第一季度)分配$/.test(type) ? "03-31" : /^(三季度|第三季度)分配$/.test(type) ? "09-30" : null;
     const period = stock.market === "A" ? day(row.REPORT_DATE) : /^20\d{2}$/.test(y) && suffix ? `${y}-${suffix}` : "";
-    if (!period || period > today) continue;
+    if (!period || period.slice(0, 4) > today.slice(0, 4)) continue;
     const special = /特别|特別|特殊|special/i.test(text + progress + type);
     const none = /不分配|不分红|不派息|不派股息/.test(text + progress);
     let amount: number | null = null, c: ForecastCurrency | null = null;
     if (stock.market === "A") {
       c = "CNY";
-      const match = text.match(/10派\s*(\d+(?:\.\d+)?)/);
+      const match = text.match(/(?:每?10股?派(?:发现金红利)?(?:应)?(?:不低于|不少于|至少)?|10派)\s*(\d+(?:\.\d+)?)/);
       const raw = match ? Number(match[1]) : forecastNumber(row.PRETAX_BONUS_RMB);
       amount = none ? 0 : raw === null ? null : raw / 10;
     } else {
@@ -95,12 +111,19 @@ export function parseForecastDividends(rows: Row[], stock: StockRecord, source: 
       // A zero declaration has no conversion requirement; retain the report currency when supplied.
       if (none) { c = currency(row.CURRENCY_CODE) ?? "HKD"; amount = 0; }
     }
-    const event: ForecastDividend = { period, amount: amount ?? 0, currency: c ?? (stock.market === "A" ? "CNY" : "HKD"), special,
+    const ex = day(row.EX_DIVIDEND_DATE ?? row.EX_DIVIDEND_DAYS), pay = day(row.DIVIDEND_DATE ?? row.PAY_DATE), record = day(row.EQUITY_RECORD_DATE);
+    const lower = /不低于|不少于|至少/.test(text);
+    const status: ForecastDividend["status"] = /取消|终止|撤销|不通过|未通过/.test(progress + text) ? "cancelled" :
+      lower || /预披露|授权|条件|拟于/.test(progress + text) ? "conditional" :
+      Boolean(ex && ex <= today || pay && pay <= today) && (/实施分配|特别分配/.test(progress) || stock.market === "HK") ? "implemented" :
+      /实施分配|特别分配|股东大会.*通过/.test(progress) ? "approved" : /董事会.*通过|预案/.test(progress) || stock.market === "HK" ? "proposed" : "unknown";
+    const event: ForecastDividend = { period, amount, status, lower_bound: lower, participating_shares: forecastNumber(row.TOTAL_SHARES),
+      ex_date: ex, record_date: record, pay_date: pay, currency: c ?? (stock.market === "A" ? "CNY" : "HKD"), special,
       ambiguous: amount === null || c === null || (text.match(/每股/g) ?? []).length > 1 || /特别.*(?:及|和|普通)|普通.*特别|特別.*(?:及|和|普通)|普通.*特別/.test(text),
-      complete: period.endsWith("12-31") && !special, evidence: { url: source, title: text || progress, date: notice } };
+      complete: period.endsWith("12-31") && !special && status !== "conditional" && status !== "cancelled" && status !== "unknown", evidence: { url: source, title: text || progress, date: notice } };
     const key = `${period}:${special ? "special" : "ordinary"}`, old = events.get(key);
     if (!old || old.evidence.date < notice) events.set(key, event);
-    else if (old.evidence.date === notice && old.amount !== event.amount) old.ambiguous = true;
+    else if (old.evidence.date === notice && (old.amount !== event.amount || old.status !== event.status)) old.ambiguous = true;
   }
   return [...events.values()].sort((a, b) => b.period.localeCompare(a.period));
 }
@@ -126,6 +149,14 @@ export async function fetchForecast(stock: StockRecord, year: number, previous?:
           snapshot.fiscal_end = String(profile.rows[0]?.YEAR_SETTLE_DAY ?? ""); native = raw.rows;
         }
         snapshot.financials = parseForecastFinancials(result.rows, stock, result.url, today, native);
+        if (stock.market === "A") {
+          try {
+            const bank = result.rows[0]?.ORG_TYPE === "银行";
+            const balance = await forecastReport(bank ? "RPT_F10_FINANCE_BBALANCE" : "RPT_F10_FINANCE_GBALANCE", filter,
+              "SECURITY_CODE,REPORT_DATE,NOTICE_DATE,OTHER_EQUITY_TOOL,PREFERRED_SHARES,PERPETUAL_BOND,TREASURY_SHARES", "REPORT_DATE", 30);
+            attachForecastBalance(snapshot.financials, balance.rows, stock, balance.url, today);
+          } catch (error) { snapshot.errors.push(`权益工具与库存股核查：${error instanceof Error ? error.message : "来源不可用"}`); }
+        }
       })(),
       (async () => {
         if (stock.market === "A") {

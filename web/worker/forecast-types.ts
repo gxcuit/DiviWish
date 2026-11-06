@@ -19,9 +19,19 @@ export interface ForecastCommitment {
   evidence: ForecastEvidence;
   approved: boolean;
 }
+export interface ForecastReconciliationInput {
+  currency: ForecastCurrency;
+  parent_profit: number | null;
+  equity_deduction: number | null;
+  weighted_shares: number | null;
+  participating_shares: number;
+  source_url: string;
+  conditions: string;
+}
 export interface ForecastManual {
   commitment: ForecastCommitment | null;
   payout_ratio: number | null;
+  reconciliation?: ForecastReconciliationInput | null;
   year: number;
 }
 export interface ForecastFinancial {
@@ -31,6 +41,13 @@ export interface ForecastFinancial {
   eps: number | null;
   profit: number | null;
   shares: number | null;
+  ordinary_profit?: number | null;
+  equity_deduction?: number | null;
+  weighted_shares?: number | null;
+  equity_status?: "none_reported" | "present" | "unknown";
+  equity_balance?: number | null;
+  treasury_balance?: number | null;
+  balance_source?: string;
   notice_date: string;
   source: string;
 }
@@ -43,9 +60,16 @@ export interface ForecastConsensus {
   analysts: number;
   source: string;
 }
+export type ForecastDividendStatus = "implemented" | "approved" | "proposed" | "conditional" | "cancelled" | "unknown";
 export interface ForecastDividend {
   period: string;
-  amount: number;
+  amount: number | null;
+  status?: ForecastDividendStatus;
+  lower_bound?: boolean;
+  participating_shares?: number | null;
+  ex_date?: string;
+  record_date?: string;
+  pay_date?: string;
   currency: ForecastCurrency;
   special: boolean;
   ambiguous: boolean;
@@ -76,14 +100,38 @@ export interface ForecastSnapshot {
   errors: string[];
   fx: { USD?: number };
 }
+export interface ForecastReconciliation {
+  status: "matched" | "approximation" | "review";
+  parent_profit: number | null;
+  ordinary_profit: number | null;
+  equity_deduction: number | null;
+  weighted_shares: number | null;
+  participating_shares: number | null;
+  share_basis: string;
+  reason: string;
+}
+export interface ForecastDistribution {
+  events: ForecastDividend[];
+  implemented: number | null;
+  approved: number | null;
+  proposed: number | null;
+  conditional: number | null;
+  special: number | null;
+  announced: number | null;
+  remaining: number | null;
+  remaining_kind: "estimate" | "lower_bound" | "unavailable";
+  reason: string;
+}
 export interface ForecastResult {
   year: number;
   status: "ready" | "lower_bound" | "unavailable" | "conflict" | "unsupported";
+  reconciliation: ForecastReconciliation;
+  distribution: ForecastDistribution;
   dividend: number | null;
   currency: ForecastCurrency;
   yield: number | null;
   basis: "plan" | "commitment" | "historical" | "manual" | null;
-  earnings_basis: "actual" | "consensus" | "ttm" | null;
+  earnings_basis: "actual" | "consensus" | "ttm" | "manual" | null;
   earnings_currency: ForecastCurrency | null;
   conversion_rate: number | null;
   commitment: ForecastCommitment | null;
