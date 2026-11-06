@@ -13,13 +13,13 @@ import type { StockRecord } from "../types.ts";
 const today = "2026-11-06";
 const evidence = { url: "https://static.cninfo.com.cn/finalpage/test.pdf", title: "股东分红回报规划", date: "2026-04-01" };
 function financial(period: string, eps: number, shares = 100): ForecastFinancial {
-  return { period, start: `${period.slice(0, 4)}-01-01`, currency: "CNY", eps, profit: eps * shares, shares, notice_date: period.endsWith("12-31") ? `${Number(period.slice(0, 4)) + 1}-03-01` : period, source: "https://example.com/financial" };
+  return { period, start: `${period.slice(0, 4)}-01-01`, currency: "CNY", equity_status: "none_reported", eps, profit: eps * shares, shares, notice_date: period.endsWith("12-31") ? `${Number(period.slice(0, 4)) + 1}-03-01` : period, source: "https://example.com/financial" };
 }
 function snapshot(year = 2026): ForecastSnapshot {
   return { year, fetched_at: `${year}-11-06T09:00:00+08:00`, fiscal_end: "12-31", fx: {}, errors: [], commitments: [],
     financials: [financial(`${year}-09-30`, 1.8), financial(`${year - 1}-12-31`, 2), financial(`${year - 1}-09-30`, 1.5), financial(`${year - 2}-12-31`, 2), financial(`${year - 3}-12-31`, 2)],
     consensus: { year, eps: 3, currency: "CNY", analysts: 3, updated_at: `${year}-10-01`, source: "https://example.com/consensus" },
-    dividends: [0.8, 1.0, 0.6].map((amount, i) => ({ period: `${year - i - 1}-12-31`, amount, currency: "CNY", special: false, ambiguous: false, complete: true, evidence })),
+    dividends: [0.8, 1.0, 0.6].map((amount, i) => ({ period: `${year - i - 1}-12-31`, amount, currency: "CNY", status: "implemented", special: false, ambiguous: false, complete: true, evidence })),
     search: { status: "not_found", from: `${year - 5}-11-06`, to: `${year}-11-06`, pending: [], reviewed: [], notes: [] } };
 }
 function stock(data = snapshot()): StockRecord { return { ...sampleStocks()[0], forecast_snapshot: data, yield_basis: "forecast" }; }
@@ -57,9 +57,9 @@ test("fixed cash and exact total commitments do not require positive earnings", 
 });
 
 test("ratio promises require the declared profit denominator and retain conditional lower bounds", () => {
-  const data = snapshot(); data.commitments = [commitment()];
+  const data = snapshot(); data.commitments = [commitment()]; data.consensus!.profit = 300;
   const result = calculateForecast(stock(data), 0.8, today); near(result.dividend, 1.5); assert.equal(result.status, "lower_bound");
-  data.financials[0].profit = 210; // Preferred-share or denominator discrepancy.
+  data.consensus!.profit = null; // EPS alone cannot establish parent profit or its per-share denominator.
   const fallback = calculateForecast(stock(data), 0.8, today); near(fallback.dividend, 1.2); assert.equal(fallback.basis, "historical");
   assert.match(fallback.notes.join(""), /分母/);
 });
@@ -177,12 +177,14 @@ test("forecast cache excludes manual parameters, reuses daily results, and relea
     assert.equal(identity.forecast_manual, undefined); assert.equal(identity.forecast_snapshot, undefined);
     calls++; const data = snapshot(year); data.fetched_at = forecastToday(); return data;
   } });
-  const s = sampleStocks()[0]; s.forecast_manual = { year: forecastYear(), commitment: null, payout_ratio: 0.9 };
+  const s = sampleStocks()[0]; s.forecast_manual = { year: forecastYear(), commitment: null, payout_ratio: 0.9,
+    reconciliation: { currency: "CNY", parent_profit: 300, equity_deduction: 30, weighted_shares: null, participating_shares: 100,
+      source_url: "https://example.com/private-profit-source", conditions: "private-equity-adjustment" } };
   await dailyForecast(f.db.binding, s, f.source); await dailyForecast(f.db.binding, s, f.source); assert.equal(calls, 1);
   f.source.fetchForecast = async () => { throw new Error("offline"); };
   await assert.rejects(dailyForecast(f.db.binding, s, f.source, true), /offline/);
   const row = f.db.sqlite.prepare("SELECT lease_until,retry_after,snapshot FROM public_forecast_cache").get()!;
-  assert.equal(row.lease_until, 0); assert.ok(Number(row.retry_after) > Date.now()); assert.ok(row.snapshot);
+  assert.equal(row.lease_until, 0); assert.ok(Number(row.retry_after) > Date.now()); assert.ok(row.snapshot); assert.ok(!String(row.snapshot).includes("private-equity-adjustment"));
   f.db.sqlite.close();
 });
 
@@ -196,10 +198,14 @@ test("forecast API persists settings, prevents stale concurrent writes and prese
   assert.equal((await f.request("/api/stocks/1/forecast?refresh=1", "POST", {})).status, 502);
   const retained = await (await f.request("/api/stocks/1/forecast")).json() as { forecast: { stale: boolean; dividend: number } }; assert.equal(retained.forecast.stale, true); near(retained.forecast.dividend, 1.5);
   f.source.fetchForecast = async (_s, year) => {
-    await f.request("/api/stocks/1", "PATCH", { forecast_manual: { year, payout_ratio: 0.6, commitment: null } });
+    await f.request("/api/stocks/1", "PATCH", { forecast_manual: { year, payout_ratio: 0.6, commitment: null,
+      reconciliation: { currency: "CNY", parent_profit: 400, equity_deduction: 40, weighted_shares: null, participating_shares: 100,
+        source_url: "https://example.com/concurrent-financial", conditions: "edited-during-refresh" } } });
     const data = snapshot(year); data.fetched_at = forecastToday(); return data;
   };
   assert.equal((await f.request("/api/stocks/1/forecast?refresh=1", "POST", {})).status, 409);
+  const edited = await (await f.request("/api/stocks/1")).json() as { forecast_manual: { reconciliation: { equity_deduction: number } } };
+  assert.equal(edited.forecast_manual.reconciliation.equity_deduction, 40);
   f.db.sqlite.close();
 });
 

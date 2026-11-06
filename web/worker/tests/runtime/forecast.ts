@@ -38,8 +38,18 @@ export async function nativeForecastTest(request: Request, env: Env) {
     check(calculateForecast(stock, 1).dividend === 2, "Native forecast computation failed");
     stock.forecast_manual = { year, payout_ratio: null, commitment: { ...cash, value: 3, conditions: "private-native-note" } };
     check(calculateForecast(stock, 1).dividend === 3, "Native manual override failed");
+    stock.forecast_snapshot!.dividends = [{ period: `${year}-06-30`, amount: .3, status: "implemented", currency: "CNY", special: false, ambiguous: false, complete: false, evidence: cash.evidence }];
+    stock.forecast_snapshot!.financials = [{ period: `${year - 1}-12-31`, start: `${year - 1}-01-01`, currency: "CNY", eps: 2, profit: 200,
+      shares: 100, equity_status: "present", notice_date: today, source: cash.evidence.url }];
+    stock.forecast_snapshot!.consensus = { year, eps: 3, currency: "CNY", analysts: 3, updated_at: today, source: cash.evidence.url };
+    stock.forecast_manual = { year, commitment: null, payout_ratio: .4, reconciliation: { currency: "CNY", parent_profit: 330,
+      equity_deduction: 30, weighted_shares: 90, participating_shares: 100, source_url: cash.evidence.url, conditions: "private-native-equity" } };
+    stock.forecast_snapshot!.commitments = [];
+    const reconciled = calculateForecast(stock, 1);
+    check(reconciled.reconciliation.ordinary_profit === 300 && reconciled.dividend === 1.2, "Native ordinary profit/share reconciliation failed");
+    check(reconciled.distribution.implemented === .3 && reconciled.distribution.remaining === .9, "Native distribution status/remainder failed");
     const row = await env.DB.prepare("SELECT snapshot FROM public_forecast_cache LIMIT 1").first<{ snapshot: string }>();
     check(row && !row.snapshot.includes("private-native-note"), "Manual parameters leaked to the native public cache");
-    return Response.json({ pdf: true, html: true, forecastCache: true, documentCache: true, manualIsolation: true });
+    return Response.json({ pdf: true, html: true, forecastCache: true, documentCache: true, manualIsolation: true, reconciliation: true, distribution: true });
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Native forecast runtime failed" }, { status: 500 }); }
 }
