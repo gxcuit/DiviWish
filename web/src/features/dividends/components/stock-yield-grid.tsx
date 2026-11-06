@@ -62,6 +62,6 @@ export function StockYieldGrid({ stock, onSave }: {
         </table>
       </div>
     </div>)}
-    <p className={styles.hint}>当前采用{yieldLabels[stock.yield_basis || "annual"]}。{stock.yield_basis === "custom" ? "对应价格 = 当前价格 × 自定义股息率 ÷ 网格股息率。" : `对应价格 = ${stock.yield_basis === "rolling" ? "滚动年度" : "年度"}${stock.instrument_type === "etf" ? "每份分红" : "每股股息"} ÷ 网格股息率；港股按汇率换算。`}按已保存设置展示，每个方向最多 201 档；结束值未对齐时止于范围内最后一格。</p>
+    <p className={styles.hint}>当前采用{yieldLabels[stock.yield_basis || "annual"]}。{stock.yield_basis === "custom" ? "对应价格 = 当前价格 × 自定义股息率 ÷ 网格股息率。" : `对应价格 = ${stock.yield_basis === "forecast" ? "预估全年" : stock.yield_basis === "rolling" ? "滚动年度" : "年度"}${stock.instrument_type === "etf" ? "每份分红" : "每股股息"} ÷ 网格股息率；港股按汇率换算。`}按已保存设置展示，每个方向最多 201 档；结束值未对齐时止于范围内最后一格。</p>
   </section>;
 }

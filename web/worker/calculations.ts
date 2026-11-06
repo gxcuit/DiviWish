@@ -1,3 +1,4 @@
+import { calculateForecast } from "./forecast.ts";
 import { payoutMetrics } from "./financial-metrics.ts";
 import type { StockRecord } from "./types.ts";
 
@@ -10,6 +11,10 @@ export function number(value: unknown): number | null {
 
 export function selectedBasis(stock: StockRecord, fxRate: unknown): [number | null, number | null] {
   const price = number(stock.price);
+  if (stock.yield_basis === "forecast") {
+    const forecast = calculateForecast(stock, fxRate);
+    return [forecast.yield, forecast.dividend];
+  }
   if (stock.yield_basis === "custom") {
     const rate = number(stock.custom_yield);
     return [rate, price && price > 0 && rate !== null ? price * rate : null];
@@ -79,8 +84,8 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
   const etf = stock.instrument_type === "etf";
   // Each saved basis drives the same series, numerator, percentile and prices.
   // Version 3 only had ETF rolling history; never reinterpret it as annual.
-  const supported = !etf || stock.history_status === "ready" &&
-    (stock.history_version === 4 || stock.history_version === 3 && stock.yield_basis !== "annual");
+  const supported = stock.yield_basis !== "forecast" && (!etf || stock.history_status === "ready" &&
+    (stock.history_version === 4 || stock.history_version === 3 && stock.yield_basis !== "annual"));
   const history = (supported ? stock.history || [] : []).flatMap(row => {
     const close = number(row.close);
     const value = stock.yield_basis === "custom"
@@ -108,13 +113,14 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     yield_basis: stock.yield_basis ?? "annual", custom_yield: stock.custom_yield ?? null,
     selected_yield: selectedYield, basis_dividend: basisDividend,
     dividend_yield: annualYield, rolling_yield: rollingYield,
+    forecast: calculateForecast(stock, fxRate),
     target_price: basisDividend !== null && target && target > 0 ? basisDividend / target : null,
     yield_gap: gap, status: yieldStatus(gap),
     ...stock.instrument_type === "etf" ? { payout_ratio: null, payout_note: "ETF 不适用个股股息支付率" } : payoutMetrics(stock),
     year_change: price && startPrice && startPrice > 0 && (!stock.year_start_year || stock.year_start_year === Number(stock.quote_date?.slice(0, 4))) ? price / startPrice - 1 : null,
     percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
-    ...(etf ? { percentile_unavailable_reason: unavailable } : {}),
+    ...(etf || stock.yield_basis === "forecast" ? { percentile_unavailable_reason: stock.yield_basis === "forecast" ? "缺少各历史时点的预测数据，预估口径不计算历史分位及分位对应价格。" : unavailable } : {}),
     percentile_history: history,
     percentile_start: history[0]?.date ?? null,
     percentile_end: history.at(-1)?.date ?? null,

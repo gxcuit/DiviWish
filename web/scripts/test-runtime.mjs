@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { packageRuntimeDependencies } from "./package-runtime-dependencies.mjs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const temporary = await mkdtemp(path.join(tmpdir(), "diviwish-standalone-"));
-// Reproduce the final image's runtime files outside the project, without node_modules.
+// Reproduce the image with only the locked forecast parser dependency closure.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packaged = path.join(temporary, "app");
 await mkdir(path.join(packaged, "scripts"), { recursive: true });
@@ -24,6 +25,16 @@ const options = { port: 0, database: path.join(temporary, "diviwish.sqlite3"), a
 };
 let service;
 try {
+  await packageRuntimeDependencies(root, packaged);
+  const { readForecastAnnouncement } = await import(pathToFileURL(path.join(packaged, "worker/forecast-announcements.ts")).href);
+  const fixturePdf = new Uint8Array(await readFile(path.join(root, "worker/tests/fixtures/forecast-runtime.pdf")));
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(fixturePdf);
+    const pages = await readForecastAnnouncement({ id: "runtime", title: "Parser test", date: "2026-11-06", url: "https://static.cninfo.com.cn/runtime.pdf" }, { code: "600036", market: "A" });
+    assert.match(pages.join(""), /Forecast parser runtime/);
+  } finally { globalThis.fetch = realFetch; }
+
   service = await startLocalServer(options);
   const request = (route, method = "GET", body, extraHeaders = {}) => {
     const url = `http://127.0.0.1:${service.port}${route}`;
@@ -75,7 +86,7 @@ try {
   assert.equal((await request(`/api/stocks/${id}`, "PATCH", { watched: false }, { Host: "personal.example", Origin: "https://personal.example" })).status, 200);
   assert.equal((await request(`/api/stocks/${id}`, "DELETE")).status, 200);
   assert.equal((await request(`/api/stocks/${id}`)).status, 404);
-  console.log("Standalone HTTP passed: direct access, removed login routes, static pages, CRUD, sectors, SQLite restart persistence, container binding, configured origin and cross-site rejection. Packaged runtime has no node_modules; only a temporary database was used.");
+  console.log("Standalone HTTP passed: direct access, removed login routes, static pages, CRUD, sectors, SQLite restart persistence, container binding, configured origin and cross-site rejection. Packaged runtime includes only the forecast parser packages, verified with a real PDF; only a temporary database was used.");
 } finally {
   if (service) await service.close();
   await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
