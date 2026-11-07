@@ -1,5 +1,4 @@
-import type { ForecastManual, ForecastSnapshot } from "./forecast-types.ts";
-import type { ForecastDocumentCache } from "./forecast-announcements.ts";
+import type { ForecastManual } from "./forecast-types.ts";
 // The local SQLite adapter supplies asynchronous statement methods to the API.
 export interface SqliteStatement {
   bind(...values: (string | number | null)[]): SqliteStatement;
@@ -60,7 +59,7 @@ export interface StockRecord extends Record<string, unknown> {
   grid_sell_start: number;
   grid_sell_end: number;
   yield_basis: "annual" | "rolling" | "custom" | "forecast";
-  forecast_snapshot?: ForecastSnapshot | null;
+  forecast_snapshot?: unknown;
   forecast_manual?: ForecastManual | null;
   forecast_error?: string | null;
   custom_yield: number | null;
@@ -123,7 +122,6 @@ export interface HistorySnapshot {
 }
 export type DividendEvent = { period: string; available: string; cash: number };
 export interface Providers {
-  fetchForecast?(stock: StockRecord, year: number, previous?: ForecastSnapshot | null, cache?: ForecastDocumentCache): Promise<ForecastSnapshot>;
   fetchHistory?(stock: StockRecord): Promise<HistorySnapshot>;
   fetchDividends?(stock: StockRecord): Promise<DividendSnapshot>;
   searchStocks(query: string): Promise<Suggestion[]>;

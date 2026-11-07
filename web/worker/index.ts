@@ -107,7 +107,7 @@ export function createHandler(source: Providers = providers) {
       if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await store.stock(id);
         if (!stock) throw new HttpError(404, "股票不存在");
-        if (stockMatch[2] === "/forecast") return await forecastResponse(request, url, stock, store, db, source);
+        if (stockMatch[2] === "/forecast") return await forecastResponse(request, stock, store);
         if (stockMatch[2] === "/history") {
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);

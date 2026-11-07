@@ -52,7 +52,6 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
   gridLevels(stock);
   gridLevels(stock, "sell");
   if (!["annual", "rolling", "custom", "forecast"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度、自定义或预估");
-  if ("forecast_manual" in input) stock.forecast_manual = validateForecastManual(input.forecast_manual);
   if (stock.instrument_type === "etf" && (stock.yield_basis === "forecast" || "forecast_manual" in input && stock.forecast_manual)) throw new Error("ETF 不适用个股预估口径");
   if (stock.custom_yield !== null) {
     const custom = number(stock.custom_yield);
@@ -71,6 +70,7 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     if (field === "target_yield" && parsed > 1) throw new Error("目标股息率须为 (0,1] 之间的小数，例如 0.05");
     stock[field] = parsed;
   }
+  if ("forecast_manual" in input) stock.forecast_manual = validateForecastManual(input.forecast_manual, stock);
   for (const field of ["confirmed", "watched"]) {
     if (field in input && typeof input[field] !== "boolean") throw new Error(`${field} 必须为布尔值`);
   }

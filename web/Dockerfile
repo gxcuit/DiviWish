@@ -6,9 +6,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
-RUN node scripts/package-runtime-dependencies.mjs
 
-# SQLite is built in; only the forecast parser dependency closure is shipped.
+# Backend runtime uses Node built-ins, including SQLite.
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
@@ -16,7 +15,6 @@ ENV NODE_ENV=production \
     WEB_PORT=3000 \
     DIVIDEND_DATABASE=/data/diviwish.sqlite3
 COPY --from=build /app/out ./out
-COPY --from=build /app/.local/runtime-dependencies/node_modules ./node_modules
 COPY package.json ./
 COPY scripts/preview.mjs scripts/local-server.mjs scripts/local-database.mjs scripts/runtime-config.mjs ./scripts/
 COPY worker ./worker
