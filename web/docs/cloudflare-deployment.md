@@ -2,9 +2,19 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `1c683590-9a34-4d9c-a010-886aba5b7c93`，于 2026-11-06 13:43（Australia/Perth）从多人版稳定分支 `multi-user` 的源码提交 `e875841` 发布，标签为 `e875841`，接收 100% 流量。本次增加独立卖出股息率网格，以及股票／ETF 的 30 分位股息率和对应价格。上一生产版本为 `4a800f12-5a2b-473c-9b3d-1cd89b38ea81`。
+当前生产版本为 `af036c3a-0668-4ce8-b612-40d30e743494`，于 2026-11-07 13:36（Australia/Perth）从多人版 `develop` / `multi-user` 的源码提交 `4cddf82` 发布，Worker 版本标签为 `4cddf82`，接收100%流量。本次将自定义输入统一为固定每股股息、币种及备注，并移除独立手动预估入口。上一生产版本为 `1c683590-9a34-4d9c-a010-886aba5b7c93`。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-11-07：自定义每股股息发布验证
+
+- 功能源码：单机版 `main` / `codex/standalone` 为 `bbf6a99`，多人版 `develop` / `multi-user` 为 `4cddf82`，均已推送至 `gxcuit/DiviWish`。本记录属于部署后的文档提交，实际部署源码仍为 `4cddf82`。
+- 单机103项、多人133项完整回归、两版类型／静态／生产构建及浏览器验证通过；多人原生 workerd 与生产 dry-run通过。验证每股1元在股价10／20元时分别为10%／5%，目标价和网格沿用固定分子；覆盖备注保留、港股换算、零值、并发编辑、旧设置转换及用户隔离。
+- 发布前导出生产账号 D1 完整备份并保存 Time Travel 书签，在备份的内存副本上演练三项迁移，确认原股票字段与用户／会话表未改变。SQL备份、恢复书签和演练报告只保存在发布工作区被忽略的 `.local/`，不提交私人数据。
+- 已应用 `0006_forecasts.sql`、`0007_custom_dividends_legacy.sql`、`0008_custom_dividends_accounts.sql`。前者只建立保留兼容的缓存表；后两项按已保存价格一次性转换旧百分比及有效人工金额，原始参数和自动快照保留。发布后无待执行迁移，未删除或重建用户表。
+- 使用锁定的 Wrangler `4.152.0`，以 `deploy --env production --keep-vars --tag 4cddf82` 发布到 `diviwish`。新版本 `af036c3a-0668-4ce8-b612-40d30e743494` 接收100%流量；发布前后 D1、生产变量、密钥绑定名称及运行时配置一致。
+- 主域名与 workers.dev 备用域名的发现／登录／注册／重置页均返回200；D1健康、LinuxDO、Turnstile及邮件配置正常；未登录访问股票、板块和BOLL返回401。页面引用产物与本地构建一致，新界面脚本 SHA-256 为 `0ee146cc5451a83348e2fcb59646c68fc94d0bf36dd1378b75adcee9626ea797`。
+- 线上核查仅执行只读请求，未登录真实用户、发送邮件或刷新个人股票。核查记录位于 `.local/custom-dividends-production-verification.json`；迁移、部署、前后版本及绑定比较记录位于 `.local/custom-release-*`。
 
 ## 2026-11-06 卖出网格与 30 分位发布验证
 

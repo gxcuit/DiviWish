@@ -29,7 +29,7 @@
 
 ## 原有数据
 
-单机迁移 `0004_custom_dividends_legacy.sql`；多人迁移 `0007_custom_dividends_legacy.sql`（兼容表）及 `0008_custom_dividends_accounts.sql`（账号表）。本地启动按各自迁移执行，线上迁移不在本次任务执行。
+单机迁移 `0004_custom_dividends_legacy.sql`；多人迁移 `0007_custom_dividends_legacy.sql`（兼容表）及 `0008_custom_dividends_accounts.sql`（账号表）。本地启动按各自迁移执行；生产迁移随经用户授权的版本发布单独执行。
 
 旧自定义百分比按升级时已经保存的股价一次性折算为每股金额，保持升级时的股息率。之后无论报价如何变化，均不再折算。缺少当时有效股价则保持金额缺失并提示核对，不能把以后新报价当成旧保存价格。有效零比例可转为零金额。
 
