@@ -218,7 +218,7 @@ export function createHandler(source: Providers = providers) {
       if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await getStock(db, id);
         if (!stock) throw new HttpError(404, "股票不存在");
-        if (stockMatch[2] === "/forecast") return await forecastResponse(request, url, stock, { stock: id => getStock(db, id), stocks: () => rawStocks(db), meta: () => metadata(db), save: (value, previous) => saveStock(db, value, previous) }, db, source);
+        if (stockMatch[2] === "/forecast") return await forecastResponse(request, stock, { stocks: () => rawStocks(db), meta: () => metadata(db) });
         if (method === "POST") throw new HttpError(405, "不支持的请求方法");
         if (stockMatch[2]) {
           if (method !== "GET") throw new HttpError(405, "不支持的请求方法");

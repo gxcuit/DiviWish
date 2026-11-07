@@ -713,35 +713,24 @@ test("daily dividends are shared across accounts while quotes display first and 
   } finally { release(); await first; }
 });
 
-test("forecasts share public inputs while manual commitments and endpoints remain owner-scoped", async t => {
+test("manual forecasts and disabled automatic routes remain owner-scoped", async t => {
   const f = accountFixture(); t.after(() => f.db.sqlite.close());
   const alice = await f.register("forecast-alice@example.test"), bob = await f.register("forecast-bob@example.test");
-  let calls = 0;
-  const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10), year = Number(today.slice(0, 4));
-  const cash = { kind: "per_share" as const, value: 1, currency: "CNY" as const, start_year: year, end_year: year, lower_bound: false, conditions: "", approved: true,
-    evidence: { url: "https://static.cninfo.com.cn/public.pdf", title: "公开分红承诺", date: today } };
-  f.source.fetchForecast = async (identity, requestedYear) => {
-    calls++; assert.equal(identity.forecast_manual, undefined); assert.equal(identity.name, identity.code);
-    return { year: requestedYear, fetched_at: today, fiscal_end: "12-31", financials: [], consensus: null, dividends: [], commitments: [cash], fx: {}, errors: [],
-      search: { status: "found", from: `${year - 5}-01-01`, to: today, pending: [], reviewed: [], notes: [] } };
-  };
+  const year = Number(new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 4));
   const add = async (cookie: string) => {
-    const response = await f.request("/api/stocks", "POST", { code: "600036", market: "A", name: "测试股票", sector: "银行", price: 10, yield_basis: "forecast" }, cookie);
+    const response = await f.request("/api/stocks", "POST", { code: "601665", market: "A", name: "测试股票", sector: "银行", price: 10, yield_basis: "forecast" }, cookie);
     assert.equal(response.status, 201); return (await response.json()).id as number;
   };
   const first = await add(alice.cookie), second = await add(bob.cookie);
+  const manual = { year, kind: "per_share", value: 2, currency: "CNY", note: "alice-private-estimate" };
   assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {})).status, 401);
-  assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {}, bob.cookie)).status, 404);
   assert.equal((await f.request(`/api/stocks/${first}/forecast`, "GET", undefined, bob.cookie)).status, 404);
-  assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {}, alice.cookie)).status, 200);
-  assert.equal((await f.request(`/api/stocks/${second}/forecast`, "POST", {}, bob.cookie)).status, 200); assert.equal(calls, 1);
-  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: { year, payout_ratio: null, commitment: { ...cash, value: 2, conditions: "alice-private-note" },
-    reconciliation: { currency: "CNY", parent_profit: 300, equity_deduction: 30, weighted_shares: null, participating_shares: 100,
-      source_url: "https://example.com/alice-private-financial", conditions: "alice-private-equity" } } }, alice.cookie)).status, 200);
+  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: manual }, bob.cookie)).status, 404);
+  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: manual }, alice.cookie)).status, 200);
+  assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {}, alice.cookie)).status, 410);
   const a = await (await f.request(`/api/stocks/${first}`, "GET", undefined, alice.cookie)).json();
   const b = await (await f.request(`/api/stocks/${second}`, "GET", undefined, bob.cookie)).json();
-  assert.equal(a.forecast_manual.reconciliation.equity_deduction, 30);
+  assert.equal(a.forecast.dividend, 2); assert.equal(b.forecast.dividend, null); assert.equal(b.forecast_manual, undefined);
   assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: null }, bob.cookie)).status, 404);
-  assert.equal(a.forecast.dividend, 2); assert.equal(b.forecast.dividend, 1); assert.equal(b.forecast_manual, undefined);
-  assert.doesNotMatch(JSON.stringify(f.db.sqlite.prepare("SELECT snapshot FROM public_forecast_cache").all()), /alice-private-note|alice-private-equity|alice-private-financial/);
+  assert.equal(f.db.sqlite.prepare("SELECT count(*) n FROM public_forecast_cache").get()!.n, 0);
 });

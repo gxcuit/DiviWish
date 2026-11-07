@@ -131,7 +131,6 @@ async function fetchTencentKline(stock: StockRecord, period: Period, param: stri
 }
 
 export const providers: Providers = {
-  async fetchForecast(...args) { const { fetchForecast } = await import("./forecast-providers.ts"); return fetchForecast(...args); },
   async fetchHistory(stock) {
     const end = historyEnd(), start = yearsBefore(end, 5);
     const ranges: { start: string; end: string }[] = [];
