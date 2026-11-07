@@ -1,9 +1,8 @@
-import { calculateForecast } from "./forecast.ts";
 import { payoutMetrics } from "./financial-metrics.ts";
 import type { StockRecord } from "./types.ts";
 
 export const GRID_DEFAULTS = { grid_start: 0.03, grid_end: 0.08, grid_step: 0.005, grid_sell_start: 0.04, grid_sell_end: 0.02 };
-export const YIELD_DEFAULTS = { yield_basis: "annual" as const, custom_yield: null };
+export const YIELD_DEFAULTS = { yield_basis: "annual" as const, custom_yield: null, custom_dividend: null, custom_dividend_currency: null, custom_dividend_note: "" };
 
 export function number(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -11,13 +10,17 @@ export function number(value: unknown): number | null {
 
 export function selectedBasis(stock: StockRecord, fxRate: unknown): [number | null, number | null] {
   const price = number(stock.price);
-  if (stock.yield_basis === "forecast") {
-    const forecast = calculateForecast(stock, fxRate);
-    return [forecast.yield, forecast.dividend];
-  }
+  if (!["annual", "rolling", "custom"].includes(stock.yield_basis ?? "annual")) return [null, null];
   if (stock.yield_basis === "custom") {
-    const rate = number(stock.custom_yield);
-    return [rate, price && price > 0 && rate !== null ? price * rate : null];
+    const amount = number(stock.custom_dividend);
+    const trading = stock.market === "HK" ? "HKD" : "CNY";
+    const currency = stock.custom_dividend_currency ?? trading;
+    const fx = number(fxRate);
+    const rate = currency === trading ? 1 : fx !== null && fx > 0 ? currency === "HKD" ? fx : 1 / fx : null;
+    const converted = amount !== null && amount >= 0 && (currency === "CNY" || currency === "HKD")
+      ? amount === 0 ? 0 : rate !== null ? amount * rate : null : null;
+    const cash = converted !== null && Number.isFinite(converted) ? converted : null;
+    return [cash !== null && price !== null && price > 0 ? cash / price : null, cash];
   }
   const dividend = number(stock.yield_basis === "rolling" ? stock.rolling_dividend : stock.annual_dividend);
   const conversion = stock.market === "HK" ? number(fxRate) : 1;
@@ -84,7 +87,7 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
   const etf = stock.instrument_type === "etf";
   // Each saved basis drives the same series, numerator, percentile and prices.
   // Version 3 only had ETF rolling history; never reinterpret it as annual.
-  const supported = stock.yield_basis !== "forecast" && (!etf || stock.history_status === "ready" &&
+  const supported = (!etf || stock.history_status === "ready" &&
     (stock.history_version === 4 || stock.history_version === 3 && stock.yield_basis !== "annual"));
   const history = (supported ? stock.history || [] : []).flatMap(row => {
     const close = number(row.close);
@@ -113,14 +116,13 @@ export function derive(stock: StockRecord, fx: unknown, aPrices: Record<string, 
     yield_basis: stock.yield_basis ?? "annual", custom_yield: stock.custom_yield ?? null,
     selected_yield: selectedYield, basis_dividend: basisDividend,
     dividend_yield: annualYield, rolling_yield: rollingYield,
-    forecast: calculateForecast(stock, fxRate),
     target_price: basisDividend !== null && target && target > 0 ? basisDividend / target : null,
     yield_gap: gap, status: yieldStatus(gap),
     ...stock.instrument_type === "etf" ? { payout_ratio: null, payout_note: "ETF 不适用个股股息支付率" } : payoutMetrics(stock),
     year_change: price && startPrice && startPrice > 0 && (!stock.year_start_year || stock.year_start_year === Number(stock.quote_date?.slice(0, 4))) ? price / startPrice - 1 : null,
     percentile: validHistory && selectedYield !== null ? values.filter(value => value <= selectedYield + 1e-12).length / values.length : null,
     percentile_count: values.length,
-    ...(etf || stock.yield_basis === "forecast" ? { percentile_unavailable_reason: stock.yield_basis === "forecast" ? "缺少各历史时点的预测数据，预估口径不计算历史分位及分位对应价格。" : unavailable } : {}),
+    ...(etf ? { percentile_unavailable_reason: unavailable } : {}),
     percentile_history: history,
     percentile_start: history[0]?.date ?? null,
     percentile_end: history.at(-1)?.date ?? null,

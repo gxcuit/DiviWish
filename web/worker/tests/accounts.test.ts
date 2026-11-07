@@ -17,7 +17,7 @@ const DIVIDEND: DividendSnapshot = { annual_dividend: 2.7, rolling_dividend: 2.8
   dividend_source: "test public reports", dividend_updated_at: "2026-10-28", dividend_fx_rate: null };
 function accountFixture() {
   const db = new TestDatabase();
-  for (const name of ["0002_accounts.sql", "0003_passwords.sql", "0004_linuxdo.sql"]) db.sqlite.exec(readFileSync(new URL(`../../migrations/${name}`, import.meta.url), "utf8"));
+  for (const name of ["0002_accounts.sql", "0003_passwords.sql", "0004_linuxdo.sql", "0008_custom_dividends_accounts.sql"]) db.sqlite.exec(readFileSync(new URL(`../../migrations/${name}`, import.meta.url), "utf8"));
   const emails: OtpMessage[] = [];
   const state = { now: Math.floor(Date.now() / 1000), failDelivery: false, challengeSuccess: true, challengeHost: "localhost", challengeAction: "send_otp" };
   const env: Env = { DB: db.binding, APP_ORIGIN: "http://localhost:3000", AUTH_EMAIL_MODE: "console", AUTH_SECRET: crypto.randomUUID() + crypto.randomUUID() };
@@ -493,7 +493,7 @@ test("saved historical basis and upgraded caches remain isolated to the signed-i
   assert.equal(detail.quantile_30_yield, 0.03); assert.equal(detail.quantile_30_price, 20);
   assert.equal(detail.percentile, 0.5); assert.equal(detail.quantile_60_yield, 0.09);
   assert.ok(detail.percentile_history.every((row: { yield: number }, i: number) => row.yield === history[i].rolling_yield));
-  await f.request(`/api/stocks/${id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.08 }, alice.cookie);
+  await f.request(`/api/stocks/${id}`, "PATCH", { yield_basis: "custom", custom_dividend: 0.8 }, alice.cookie);
   const custom = await (await f.request(`/api/stocks/${id}/history`, "POST", {}, alice.cookie)).json();
   assert.equal(calls, 1); assert.equal(custom.percentile, 1); assert.equal(custom.quantile_60_price, 10);
   assert.ok(custom.percentile_history.every((row: { yield: number }) => row.yield === 0.08));
@@ -713,24 +713,30 @@ test("daily dividends are shared across accounts while quotes display first and 
   } finally { release(); await first; }
 });
 
-test("manual forecasts and disabled automatic routes remain owner-scoped", async t => {
+test("custom dividends, notes and legacy conversion remain owner-scoped", async t => {
   const f = accountFixture(); t.after(() => f.db.sqlite.close());
-  const alice = await f.register("forecast-alice@example.test"), bob = await f.register("forecast-bob@example.test");
-  const year = Number(new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 4));
+  const alice = await f.register("custom-alice@example.test"), bob = await f.register("custom-bob@example.test");
   const add = async (cookie: string) => {
-    const response = await f.request("/api/stocks", "POST", { code: "601665", market: "A", name: "测试股票", sector: "银行", price: 10, yield_basis: "forecast" }, cookie);
+    const response = await f.request("/api/stocks", "POST", { code: "601665", market: "A", name: "测试股票", sector: "银行", price: 10 }, cookie);
     assert.equal(response.status, 201); return (await response.json()).id as number;
   };
   const first = await add(alice.cookie), second = await add(bob.cookie);
-  const manual = { year, kind: "per_share", value: 2, currency: "CNY", note: "alice-private-estimate" };
-  assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {})).status, 401);
-  assert.equal((await f.request(`/api/stocks/${first}/forecast`, "GET", undefined, bob.cookie)).status, 404);
-  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: manual }, bob.cookie)).status, 404);
-  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: manual }, alice.cookie)).status, 200);
+  const payload = { yield_basis: "custom", custom_dividend: 2, custom_dividend_currency: "CNY", custom_dividend_note: "alice-private-note" };
+  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", payload)).status, 401);
+  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", payload, bob.cookie)).status, 404);
+  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", payload, alice.cookie)).status, 200);
   assert.equal((await f.request(`/api/stocks/${first}/forecast`, "POST", {}, alice.cookie)).status, 410);
-  const a = await (await f.request(`/api/stocks/${first}`, "GET", undefined, alice.cookie)).json();
+  let a = await (await f.request(`/api/stocks/${first}`, "GET", undefined, alice.cookie)).json();
   const b = await (await f.request(`/api/stocks/${second}`, "GET", undefined, bob.cookie)).json();
-  assert.equal(a.forecast.dividend, 2); assert.equal(b.forecast.dividend, null); assert.equal(b.forecast_manual, undefined);
-  assert.equal((await f.request(`/api/stocks/${first}`, "PATCH", { forecast_manual: null }, bob.cookie)).status, 404);
-  assert.equal(f.db.sqlite.prepare("SELECT count(*) n FROM public_forecast_cache").get()!.n, 0);
+  assert.equal(a.selected_yield, .2); assert.equal(a.custom_dividend_note, "alice-private-note"); assert.equal(b.custom_dividend, null);
+  assert.doesNotMatch(JSON.stringify(b), /alice-private-note/);
+  // Convert two distinct saved legacy rates, preserving the owner partition and original fields.
+  for (const [id, rate] of [[first, .08], [second, .03]]) f.db.sqlite.prepare("UPDATE user_stocks SET document=? WHERE id=?")
+    .run(JSON.stringify({ yield_basis: "custom", price: 10, custom_yield: rate, private_note: `owner-${id}` }), id);
+  f.db.sqlite.exec(readFileSync(new URL("../../migrations/0008_custom_dividends_accounts.sql", import.meta.url), "utf8"));
+  a = await (await f.request(`/api/stocks/${first}`, "GET", undefined, alice.cookie)).json();
+  const convertedBob = await (await f.request(`/api/stocks/${second}`, "GET", undefined, bob.cookie)).json();
+  assert.equal(a.custom_dividend, .8); assert.equal(convertedBob.custom_dividend, .3);
+  assert.equal(a.private_note, `owner-${first}`); assert.equal(convertedBob.private_note, `owner-${second}`);
+  assert.equal((await f.request(`/api/stocks/${first}`, "GET", undefined, bob.cookie)).status, 404);
 });

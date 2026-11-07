@@ -1,5 +1,4 @@
 import { HttpError as SharedHttpError } from "./http.ts";
-import { forecastResponse } from "./forecast-service.ts";
 import type { D1Database } from "@cloudflare/workers-types";
 import { BollingerService } from "./bollinger.ts";
 import { getStock, initialize, metadata, rawStocks, render, saveStock, sectorRecords } from "./database.ts";
@@ -218,7 +217,7 @@ export function createHandler(source: Providers = providers) {
       if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await getStock(db, id);
         if (!stock) throw new HttpError(404, "股票不存在");
-        if (stockMatch[2] === "/forecast") return await forecastResponse(request, stock, { stocks: () => rawStocks(db), meta: () => metadata(db) });
+        if (stockMatch[2] === "/forecast") throw new HttpError(410, "预估入口已移除，请使用自定义每股股息");
         if (method === "POST") throw new HttpError(405, "不支持的请求方法");
         if (stockMatch[2]) {
           if (method !== "GET") throw new HttpError(405, "不支持的请求方法");

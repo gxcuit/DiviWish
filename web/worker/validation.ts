@@ -1,4 +1,3 @@
-import { validateForecastManual } from "./forecast.ts";
 import { GRID_DEFAULTS, YIELD_DEFAULTS, gridLevels, number } from "./calculations.ts";
 import type { StockRecord } from "./types.ts";
 
@@ -11,7 +10,7 @@ export const DEFAULT_STOCK = {
   dividends: [], history: [], connect_factor: null,
 };
 const EDITABLE = new Set(["instrument_type", "exchange", "code", "name", "sector", "market", "price", "annual_dividend", "rolling_dividend", "target_yield",
-  "confirmed", "ex_dividend_date", "watched", "a_code", "year_start_price", ...Object.keys(GRID_DEFAULTS), ...Object.keys(YIELD_DEFAULTS), "forecast_manual"]);
+  "confirmed", "ex_dividend_date", "watched", "a_code", "year_start_price", ...Object.keys(GRID_DEFAULTS), ...Object.keys(YIELD_DEFAULTS).filter(key => key !== "custom_yield")]);
 
 export function timestamp(): string {
   return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19) + "+08:00";
@@ -51,14 +50,12 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
   }
   gridLevels(stock);
   gridLevels(stock, "sell");
-  if (!["annual", "rolling", "custom", "forecast"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度、自定义或预估");
-  if (stock.instrument_type === "etf" && (stock.yield_basis === "forecast" || "forecast_manual" in input && stock.forecast_manual)) throw new Error("ETF 不适用个股预估口径");
-  if (stock.custom_yield !== null) {
-    const custom = number(stock.custom_yield);
-    if (custom === null || custom < 0 || custom > 1) throw new Error("自定义股息率须为 0% 至 100% 的有效数字");
-    stock.custom_yield = custom;
-  }
-  if (stock.yield_basis === "custom" && stock.custom_yield === null) throw new Error("选择自定义口径时，请填写自定义股息率");
+  if (!["annual", "rolling", "custom"].includes(stock.yield_basis)) throw new Error("股息率口径只能为年度、滚动年度或自定义每股股息");
+  if (stock.custom_dividend !== null && (number(stock.custom_dividend) === null || stock.custom_dividend < 0 || stock.custom_dividend > 1e9)) throw new Error("自定义每股股息须为有效的非负金额");
+  if (stock.custom_dividend_currency !== null && !["CNY", "HKD"].includes(stock.custom_dividend_currency)) throw new Error("自定义股息币种须为人民币或港币");
+  if (typeof stock.custom_dividend_note !== "string" || stock.custom_dividend_note.length > 2000) throw new Error("自定义股息备注最多2000字");
+  stock.custom_dividend_note = stock.custom_dividend_note.trim();
+  if (input.yield_basis === "custom" && stock.custom_dividend === null) throw new Error("请选择并填写自定义每股股息，明确不分红可填0");
   if (!["A", "HK"].includes(stock.market)) throw new Error("市场只能为 A 或 HK");
   const length = stock.market === "A" ? 6 : 5;
   if (!new RegExp(`^[0-9]{${length}}$`).test(stock.code)) throw new Error(`股票代码需要 ${length} 位数字`);
@@ -70,7 +67,6 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     if (field === "target_yield" && parsed > 1) throw new Error("目标股息率须为 (0,1] 之间的小数，例如 0.05");
     stock[field] = parsed;
   }
-  if ("forecast_manual" in input) stock.forecast_manual = validateForecastManual(input.forecast_manual, stock);
   for (const field of ["confirmed", "watched"]) {
     if (field in input && typeof input[field] !== "boolean") throw new Error(`${field} 必须为布尔值`);
   }
@@ -94,6 +90,7 @@ export function validate(data: unknown, existing?: StockRecord): StockRecord {
     if (!("confirmed" in input)) stock.confirmed = false;
     if (changed(["code", "market", "instrument_type", "exchange"])) {
       delete stock.forecast_snapshot; delete stock.forecast_manual; delete stock.forecast_error;
+      Object.assign(stock, { custom_yield: null, custom_dividend: null, custom_dividend_currency: null, custom_dividend_note: "" });
       for (const field of ["price", "annual_dividend", "ex_dividend_date", "year_start_price", "a_code"] as const) {
         if (!(field in input)) stock[field] = null;
       }
