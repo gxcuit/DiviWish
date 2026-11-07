@@ -1,4 +1,3 @@
-import type { ForecastManual } from "./forecast-types.ts";
 // The local SQLite adapter supplies asynchronous statement methods to the API.
 export interface SqliteStatement {
   bind(...values: (string | number | null)[]): SqliteStatement;
@@ -58,11 +57,14 @@ export interface StockRecord extends Record<string, unknown> {
   grid_step: number;
   grid_sell_start: number;
   grid_sell_end: number;
-  yield_basis: "annual" | "rolling" | "custom" | "forecast";
+  yield_basis: "annual" | "rolling" | "custom";
   forecast_snapshot?: unknown;
-  forecast_manual?: ForecastManual | null;
+  forecast_manual?: unknown;
   forecast_error?: string | null;
-  custom_yield: number | null;
+  custom_yield: number | null; // Archived legacy percentage; never used in calculations.
+  custom_dividend: number | null;
+  custom_dividend_currency: "CNY" | "HKD" | null;
+  custom_dividend_note: string;
 }
 
 export interface StockRow {

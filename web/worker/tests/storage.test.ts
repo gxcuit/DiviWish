@@ -23,7 +23,7 @@ test("local SQLite migrates and persists one portfolio; failed batches roll back
     assert.equal(await db.prepare("SELECT * FROM sectors WHERE name='应回滚'").first(), null);
     db.close(); db = new LocalDatabase(filename, migrations);
     assert.ok(await db.prepare("SELECT * FROM sectors WHERE name='银行'").first());
-    assert.equal((await db.prepare("SELECT count(*) AS n FROM local_migrations").first())!.n, 3);
+    assert.equal((await db.prepare("SELECT count(*) AS n FROM local_migrations").first())!.n, 4);
     assert.equal(await db.prepare("SELECT * FROM sqlite_master WHERE name='users'").first(), null);
   } finally { db.close(); }
 });

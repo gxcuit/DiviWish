@@ -19,7 +19,7 @@ test("sell yields descend exactly from their own start and prices rise with the 
   assert.equal(yieldGrid({ ...hk, ...settings }, null, "sell")[0].reached, null);
   assert.equal(yieldGrid({ ...stock, ...settings, annual_dividend: null }, 0.8, "sell")[0].price, null);
   assert.equal(yieldGrid({ ...stock, ...settings, price: null }, 0.8, "sell")[0].reached, null);
-  const custom = yieldGrid({ ...hk, ...settings, yield_basis: "custom", custom_yield: 0.06 }, null, "sell");
+  const custom = yieldGrid({ ...hk, ...settings, yield_basis: "custom", custom_dividend: 0.48 }, null, "sell");
   assert.equal(custom[0].price, hk.price); assert.equal(custom[0].reached, true);
   const rolling = yieldGrid({ ...stock, ...settings, yield_basis: "rolling" }, 0.8, "sell");
   assert.equal(rolling[0].price, 10); assert.equal(rolling[0].reached, true);

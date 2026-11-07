@@ -39,7 +39,7 @@ test("invalid updates leave the full saved document unchanged", async t => {
   assert.deepEqual(await (await f.request("/api/stocks/1")).json(), before);
 });
 
-test("basis, grid, zero custom rates and security edits preserve the established calculation rules", async t => {
+test("basis, grid, zero custom dividends and security edits preserve the established calculation rules", async t => {
   const f = fixture(); t.after(() => f.db.sqlite.close());
   let response = await f.request("/api/stocks/1", "PATCH", { yield_basis: "rolling", grid_start: 0.04, grid_end: 0.06, grid_step: 0.005 });
   assert.equal(response.status, 200);
@@ -47,18 +47,18 @@ test("basis, grid, zero custom rates and security edits preserve the established
   assert.equal(detail.selected_yield, 0.06); assert.equal(detail.dividend_yield, 0.05); assert.ok(Math.abs(detail.target_price - 12) < 1e-12);
   assert.equal(detail.percentile, null); assert.equal(detail.percentile_count, 0); assert.deepEqual(detail.yield_grid.map((row: { yield: number }) => row.yield), [0.04, 0.045, 0.05, 0.055, 0.06]);
   assert.equal((await (await f.request("/api/stocks/2")).json()).grid_start, 0.03);
-  await f.request("/api/stocks/1", "PATCH", { yield_basis: "custom", custom_yield: 0.08 });
+  await f.request("/api/stocks/1", "PATCH", { yield_basis: "custom", custom_dividend: 0.8 });
   detail = await (await f.request("/api/stocks/1")).json();
   assert.equal(detail.quantile_30_yield, 0.08); assert.equal(detail.quantile_30_price, 10);
   assert.equal(detail.percentile, 1); assert.equal(detail.quantile_60_yield, 0.08); assert.equal(detail.quantile_60_price, 10);
   assert.ok(detail.percentile_history.every((row: { yield: number }) => row.yield === 0.08));
   response = await f.request("/api/stocks/1", "PATCH", { price: 20 });
-  detail = await response.json(); assert.equal(detail.selected_yield, 0.08); assert.equal(detail.target_price, 32);
-  await f.request("/api/stocks/1", "PATCH", { custom_yield: 0 });
+  detail = await response.json(); assert.equal(detail.selected_yield, 0.04); assert.equal(detail.target_price, 16);
+  await f.request("/api/stocks/1", "PATCH", { custom_dividend: 0 });
   detail = await (await f.request("/api/stocks/1")).json(); assert.equal(detail.selected_yield, 0); assert.equal(detail.target_price, 0);
   await f.request("/api/stocks/1", "PATCH", { code: "600009" });
   detail = await (await f.request("/api/stocks/1")).json();
-  for (const field of ["price", "annual_dividend", "rolling_dividend", "quote_date", "percentile", "custom_yield"]) assert.equal(detail[field], null, field);
+  for (const field of ["price", "annual_dividend", "rolling_dividend", "quote_date", "percentile", "custom_dividend"]) assert.equal(detail[field], null, field);
   assert.equal(detail.yield_basis, "annual"); assert.deepEqual(detail.history, []); assert.deepEqual(detail.dividends, []);
 });
 
@@ -109,14 +109,14 @@ test("refresh failure preserves every value; partial success keeps old missing q
 test("refresh merges quotes without overwriting concurrent edits and skips changed identities", async t => {
   const f = fixture(); t.after(() => f.db.sqlite.close());
   f.source.fetchQuotes = async () => {
-    await f.request("/api/stocks/1", "PATCH", { watched: true, yield_basis: "custom", custom_yield: 0.08 });
+    await f.request("/api/stocks/1", "PATCH", { watched: true, yield_basis: "custom", custom_dividend: 0.8 });
     await f.request("/api/stocks/2", "PATCH", { code: "00002" });
     return { quotes: new Map([[1, { price: 9, quote_date: "2026-10-21" }], [2, { price: 20, quote_date: "2026-10-21" }]]), errors: [] };
   };
   const response = await f.request("/api/refresh", "POST", {});
   assert.equal((await response.json()).updated, 1);
   const stock = await (await f.request("/api/stocks/1")).json();
-  assert.equal(stock.watched, true); assert.equal(stock.price, 9); assert.equal(stock.selected_yield, 0.08);
+  assert.equal(stock.watched, true); assert.equal(stock.price, 9); assert.equal(stock.selected_yield, 0.8 / 9);
   assert.equal((await (await f.request("/api/stocks/2")).json()).price, null);
 });
 

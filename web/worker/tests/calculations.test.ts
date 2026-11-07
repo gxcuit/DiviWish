@@ -31,9 +31,9 @@ test("grid endpoints use decimal arithmetic, custom cash uses trading currency a
   const missing = { ...a, yield_basis: "rolling" as const, rolling_dividend: null };
   assert.equal(derive(missing, 0.8).selected_yield, null); assert.equal(yieldGrid(missing, 0.8)[0].price, null);
   near(derive({ ...hk, yield_basis: "rolling" }, 0.8).selected_yield, 0.6 / 8 / 0.8);
-  const custom = { ...hk, yield_basis: "custom" as const, custom_yield: 0.1 };
+  const custom = { ...hk, yield_basis: "custom" as const, custom_dividend: 0.8 };
   near(derive(custom, null).target_price, 16); near(yieldGrid(custom, null)[0].price, 0.8 / 0.03);
-  assert.equal(derive({ ...custom, price: null }, null).target_price, null);
+  near(derive({ ...custom, price: null }, null).target_price, 16);
   assert.equal(number(true), null); assert.equal(number("5"), null); assert.equal(number(NaN), null);
 });
 
@@ -45,15 +45,15 @@ test("saved basis drives the percentile, plotted samples and inverse prices with
   near(rolling.percentile, 0.5); near(rolling.quantile_60_yield, 0.09); near(rolling.quantile_60_price, 0.6 / 0.09);
   assert.deepEqual(rolling.percentile_history.map(row => row.yield), history.map(row => row.rolling_yield));
   assert.deepEqual(rolling.history, history);
-  const custom = { ...hk, history, yield_basis: "custom" as const, custom_yield: 0.1 };
+  const custom = { ...hk, history, yield_basis: "custom" as const, custom_dividend: 0.8 };
   const result = derive(custom, null);
   near(result.quantile_30_yield, 0.04); near(result.quantile_30_price, 20);
   near(result.percentile, 0.75); near(result.quantile_60_yield, 0.08); near(result.quantile_60_price, 10);
   assert.deepEqual(result.percentile_history.slice(0, 4).map(row => row.yield), [0.16, 0.08, 0.04, 0.02]);
   const refreshed = derive({ ...custom, price: 20 }, null);
-  near(refreshed.quantile_30_yield, 0.1); near(refreshed.quantile_30_price, 20);
-  near(refreshed.percentile, 0.5); near(refreshed.quantile_60_yield, 0.2); near(refreshed.quantile_60_price, 10);
-  const zero = derive({ ...custom, custom_yield: 0 }, null);
+  near(refreshed.quantile_30_yield, 0.04); near(refreshed.quantile_30_price, 20);
+  near(refreshed.percentile, 0.5); near(refreshed.quantile_60_yield, 0.08); near(refreshed.quantile_60_price, 10);
+  const zero = derive({ ...custom, custom_dividend: 0 }, null);
   near(zero.quantile_30_yield, 0); assert.equal(zero.quantile_30_price, null);
   near(zero.percentile, 1); near(zero.quantile_60_yield, 0); assert.equal(zero.quantile_60_price, null);
   assert.equal(derive({ ...custom, price: null }, null).percentile, null);

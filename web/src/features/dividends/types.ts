@@ -1,4 +1,3 @@
-import type { ForecastManual, ForecastResult } from "../../../worker/forecast-types";
 export interface DividendPart {
   period: string;
   dps: number;
@@ -19,15 +18,15 @@ export interface StockPreview {
 }
 
 export interface Stock {
-  forecast?: ForecastResult;
-  forecast_manual?: ForecastManual | null;
   history_status?: "ready" | "not_applicable";
   history_version?: number;
   history_updated_at?: string;
   history_note?: string;
   history_source?: string;
   yield_basis: YieldBasis;
-  custom_yield: number | null;
+  custom_dividend: number | null;
+  custom_dividend_currency: "CNY" | "HKD" | null;
+  custom_dividend_note: string;
   selected_yield: number | null;
   basis_dividend: number | null;
   grid_start: number;
@@ -109,11 +108,13 @@ export interface GridSettings {
   grid_sell_end: number;
 }
 
-export type YieldBasis = 'annual' | 'rolling' | 'custom' | 'forecast';
+export type YieldBasis = 'annual' | 'rolling' | 'custom';
 
 export interface YieldBasisSettings {
   yield_basis: YieldBasis;
-  custom_yield: number | null;
+  custom_dividend: number | null;
+  custom_dividend_currency: "CNY" | "HKD" | null;
+  custom_dividend_note: string;
 }
 
 export interface StocksResponse {

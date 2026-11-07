@@ -1,4 +1,3 @@
-import { forecastResponse } from "./forecast-service.ts";
 import { initialize } from "./database.ts";
 import { BollingerService } from "./bollinger.ts";
 import { dailyDividend } from "./dividend-cache.ts";
@@ -107,7 +106,7 @@ export function createHandler(source: Providers = providers) {
       if (stockMatch && ["GET", "PATCH", "DELETE", "POST"].includes(method)) {
         const id = Number(stockMatch[1]), stock = await store.stock(id);
         if (!stock) throw new HttpError(404, "股票不存在");
-        if (stockMatch[2] === "/forecast") return await forecastResponse(request, stock, store);
+        if (stockMatch[2] === "/forecast") throw new HttpError(410, "预估入口已移除，请使用自定义每股股息");
         if (stockMatch[2] === "/history") {
           if (method !== "POST") throw new HttpError(405, "请使用 POST 获取历史分位");
           await bodyJson(request);

@@ -62,7 +62,7 @@ test("ETF annual, rolling and custom history, quantiles and prices follow the sa
   assert.equal(rolling.quantile_60_yield, 0.053);
   assert.equal(rolling.quantile_90_yield, 0.08);
   assert.equal(rolling.quantile_60_price, 0.12 / 0.053);
-  const custom = derive({ ...stock, yield_basis: "custom", custom_yield: 0.2 }, 1);
+  const custom = derive({ ...stock, yield_basis: "custom", custom_dividend: 0.4 }, 1);
   assert.equal(custom.percentile, 1);
   assert.ok(custom.percentile_history.every(row => row.yield === 0.2));
   assert.equal(custom.quantile_30_yield, 0.2);

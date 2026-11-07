@@ -157,7 +157,7 @@ test("ETF ready histories survive outages, retain concurrent watch settings and 
   assert.equal(before.watched, true);
   assert.equal(before.percentile_count, 60);
   assert.equal(before.quantile_90_price, before.rolling_dividend / before.quantile_90_yield);
-  await f.request(`/api/stocks/${saved.id}`, "PATCH", { yield_basis: "custom", custom_yield: 0.9 });
+  await f.request(`/api/stocks/${saved.id}`, "PATCH", { yield_basis: "custom", custom_dividend: 0.9 });
   const custom = await (await f.request(`/api/stocks/${saved.id}`)).json();
   assert.notEqual(custom.percentile, before.percentile);
   assert.equal(custom.percentile, 1);

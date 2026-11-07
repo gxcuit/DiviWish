@@ -19,7 +19,7 @@ export function EtfHistory({ stock, state, onRetry }: { stock: StockDetail; stat
       <div><span>90 分位{label} / 对应价格</span><strong>{rate(stock.quantile_90_yield)} / {price(stock.quantile_90_price)}</strong></div>
     </div>
     <p className={styles.muted}>统计 {stock.percentile_start || "—"} 至 {stock.percentile_end || "—"} · {stock.percentile_count} 个有效交易日（最多近五年，至少60日）。<br />分位 = 历史所选派息率 ≤ 当前所选派息率的样本占比。对应价格 = 当前所选口径每份分红 ÷ 分位派息率；分位派息率为零时无对应价格。分位、价格及列表网格均采用已保存的{label}。</p>
-    <p className={styles.muted}>{basis === "annual" ? "历史各交易日采用上一完整自然年按除息日统计的现金分红，折算至当日份额，再除以当日不复权收盘价；不会纳入当年后续分红。" : basis === "rolling" ? "各交易日按此前12个月（左开右闭）已除息分红计算；两笔年度分红可能暂时重叠，也可能出现空档。" : "以当前价格 × 自定义派息率得到估算每份分红，再除以历史收盘价。这是估算回溯，不代表历史实际派息；报价变化后会重算。"}</p>
+    <p className={styles.muted}>{basis === "annual" ? "历史各交易日采用上一完整自然年按除息日统计的现金分红，折算至当日份额，再除以当日不复权收盘价；不会纳入当年后续分红。" : basis === "rolling" ? "各交易日按此前12个月（左开右闭）已除息分红计算；两笔年度分红可能暂时重叠，也可能出现空档。" : "用保存的自定义每份分红（换算至股价币种）除以历史收盘价，作为固定分红估算回溯，不代表历史实际派息；报价变化不会改写每份金额。"}</p>
     {stock.history_note && <p className={styles.muted}>{stock.history_note}</p>}
     {stock.history_updated_at && <p className={styles.muted}>历史更新 {stock.history_updated_at}<br />来源：{stock.history_source}</p>}
   </section>;

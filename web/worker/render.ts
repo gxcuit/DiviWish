@@ -7,6 +7,8 @@ export function render(stock: StockRecord, records: StockRecord[], meta: Record<
   delete result._refresh_id;
   delete result.forecast_snapshot;
   delete result.forecast_error;
+  delete result.forecast_manual;
+  delete result.custom_yield;
   delete result.connect_factor;
   delete result.a_price;
   if (detail) {
