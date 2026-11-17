@@ -1,3 +1,4 @@
+import { resolveMarketSelection } from "./market-indices.ts";
 import { MarketService } from "./market.ts";
 import { ensureEtfSector } from "./onboarding.ts";
 import { createLinuxdoAuth } from "./linuxdo.ts";
@@ -34,7 +35,8 @@ export function createHandler(source: Providers = providers, authOptions: Parame
       if (method === "GET" && ["/api/stocks", "/api/sectors"].includes(path)) await ensureEtfSector(db, user.id);
       if (path === "/api/market") {
         if (method !== "GET") throw new HttpError(405, "请使用 GET 获取市场数据");
-        try { return json(await market.get(url.searchParams.get("refresh") === "1")); }
+        const selection = validated(() => resolveMarketSelection(url.searchParams.get("a"), url.searchParams.get("b")));
+        try { return json(await market.get(url.searchParams.get("refresh") === "1", selection)); }
         catch (failure) { throw new HttpError(502, failure instanceof Error ? failure.message : "市场数据获取失败"); }
       }
       if (path === "/api/stocks/preview" && method === "GET") {

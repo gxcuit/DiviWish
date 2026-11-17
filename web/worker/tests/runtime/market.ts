@@ -1,3 +1,4 @@
+import { resolveMarketSelection } from "../../market-indices.ts";
 import { MarketService, parseIndexHistory } from "../../market.ts";
 
 export async function nativeMarketTest() {
@@ -15,6 +16,8 @@ export async function nativeMarketTest() {
     if (first.relative.window !== 242 || first.relative.latest.middle !== 1 || first.regression?.count !== 350) throw new Error("Native ratio BOLL or regression failed");
     const cached = await service.get(true);
     if (!cached.cached || calls !== 2) throw new Error("Native public cache failed");
+    const selected = await service.get(false, resolveMarketSelection("H20269"));
+    if (selected.selection.a.code !== "H20269" || Number(calls) !== 3 || selected.relative.window !== 242) throw new Error("Native combination selection/cache failed");
     now += 31 * 60_000; fail = true;
     const stale = await service.get();
     if (!stale.stale || stale.latest.date !== first.latest.date) throw new Error("Native stale result retention failed");

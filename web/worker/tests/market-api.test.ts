@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createHandler } from "../index.ts";
 import { digest } from "../auth.ts";
+import { resolveMarketSelection } from "../market-indices.ts";
 import { MarketService } from "../market.ts";
 import type { Env } from "../types.ts";
 import { TestDatabase } from "./helpers.ts";
@@ -23,6 +24,13 @@ test("market requires login, shares only public data, rejects invalid methods, a
   const response = await request(cookie); assert.equal(response.status, 200, await response.clone().text());
   const snapshot = await response.json(); assert.equal(snapshot.latest.spread, 0); assert.equal(snapshot.series.length, 50);
   assert.equal(snapshot.user_id, undefined);
+  assert.equal((await handler(new Request("http://localhost/api/market?a=H20269"), env)).status, 401);
+  for (const code of ["H20269", "H20955"]) {
+    const selected = await handler(new Request(`http://localhost/api/market?a=${code}&b=000510CNY010`, { headers: { Cookie: cookie } }), env);
+    assert.equal(selected.status, 200); assert.equal((await selected.json()).selection.a.code, code);
+  }
+  assert.equal((await handler(new Request("http://localhost/api/market?a=H30269", { headers: { Cookie: cookie } }), env)).status, 400);
+  assert.equal((await service.get(false, resolveMarketSelection("H20269"))).selection.a.code, "H20269");
   assert.equal((await request(cookie, "DELETE")).status, 405);
   assert.equal(db.sqlite.prepare("SELECT count(*) n FROM user_stocks").get()!.n, 0);
   assert.equal(db.sqlite.prepare("SELECT count(*) n FROM user_metadata").get()!.n, 0);
