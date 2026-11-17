@@ -2,9 +2,19 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `af036c3a-0668-4ce8-b612-40d30e743494`，于 2026-11-07 13:36（Australia/Perth）从多人版 `develop` / `multi-user` 的源码提交 `4cddf82` 发布，Worker 版本标签为 `4cddf82`，接收100%流量。本次将自定义输入统一为固定每股股息、币种及备注，并移除独立手动预估入口。上一生产版本为 `1c683590-9a34-4d9c-a010-886aba5b7c93`。
+当前生产版本为 `0dcbb409-f4ba-4284-b305-3172fe3f3bd9`，于 2026-11-17 12:44（Australia/Perth）从多人版 `develop` / `multi-user` 的源码提交 `f91a0ca` 发布，Worker 版本标签为 `f91a0ca`，接收100%流量。本次增加“市场”页、中证红利全收益减中证A500全收益的40个交易日收益差及交互图表。上一生产版本为 `af036c3a-0668-4ce8-b612-40d30e743494`。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-11-17：市场情况与40日收益差发布验证
+
+- 功能源码：单机版 `main` / `codex/standalone` 为 `ca6b6c8`，多人版 `develop` / `multi-user` 为 `f91a0ca`，四个分支均已推送至 `gxcuit/DiviWish`。本节属于部署后的文档提交，实际部署源码仍为 `f91a0ca`。
+- 两版通过 lint、前后端类型、全部业务回归、webpack静态构建及临时SQLite HTTP检查；多人版通过生产配置dry-run和原生workerd回归。两版1280／390px浏览器验证覆盖导航、时间范围、收益差／指数涨跌幅切换、键盘滑块、历史返回、刷新失败保留与空状态重试，均无脚本错误或手机横向溢出。
+- 隔离Cloudflare远程预览真实取得两条中证全收益指数历史并完成收益差计算，得到1239个有效观察日，截至2026-11-16；探针未绑定生产D1或应用密钥。首次取数遇到临时超时，后续逐指数读取和完整服务重试均成功；应用保留原有超时、失败提示与上次成功结果处理。公式与数据口径见[市场说明](market.md)。
+- 使用Wrangler `4.152.0`、`deploy --env production --keep-vars --tag f91a0ca` 发布到现有Worker `diviwish`。新版本 `0dcbb409-f4ba-4284-b305-3172fe3f3bd9` 接收100%流量；发布前后全部15项D1、变量和密钥绑定逐项一致，兼容日期及其他运行配置未改动，没有执行数据库迁移。
+- 主域名与workers.dev备用域名的市场／登录／注册／重置页均返回200；D1健康与登录配置正常。未登录访问市场、股票及板块接口均返回401，跨站刷新返回403；两个域名实际引用的各10个JS/CSS产物均与已验证构建的SHA-256一致，含新市场页代码。
+- 线上核查只执行只读请求，未登录真实生产账号、发邮件或刷新个人股票。登录后的交互与隔离在临时账号和本地浏览器中验证；真实上游取数另由Cloudflare隔离预览覆盖。单机版继续在本机3000端口提供已构建页面。
+- 只读上线报告位于发布工作区被忽略的 `.local/market-production-verification.json`，远程取数报告为 `.local/market-remote-verification.json`，部署日志为 `.local/market-deploy.log`；前后版本和流量信息保存在 `.local/market-before-version.json`、`.local/market-after-version.json` 与 `.local/market-after-deployments.log`。不提交凭据、数据库或私人数据。
 
 ## 2026-11-07：自定义每股股息发布验证
 
