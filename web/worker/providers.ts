@@ -6,6 +6,7 @@ import { yearBaseline } from "./financial-metrics.ts";
 import { number } from "./calculations.ts";
 import { dateString } from "./validation.ts";
 import type { Kline, Period, Providers, Quote, StockRecord, Suggestion } from "./types.ts";
+import { SourceHttpError as MarketHttpError, describeSourceFailure } from "./source-failure.ts";
 
 export function symbolFor(stock: Pick<StockRecord, "market" | "code" | "instrument_type" | "exchange">): string {
   if (stock.market === "HK") return "hk" + stock.code;
@@ -25,11 +26,6 @@ function numeric(value: unknown): number | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   if (typeof value === "string" && !value.trim()) return null;
   return number(Number(value));
-}
-
-class MarketHttpError extends Error {
-  status: number;
-  constructor(status: number) { super(`行情服务 HTTP ${status}`); this.status = status; }
 }
 
 // The timeout covers reading the response body as well as receiving its headers.
@@ -171,8 +167,10 @@ export const providers: Providers = {
         const parsed = parseQuotes(await load("https://qt.gtimg.cn/q=" + group.map(symbolFor).join(","), "gbk"), group);
         for (const [id, quote] of parsed.quotes) quotes.set(id, quote);
         errors.push(...parsed.errors);
-      } catch {
-        errors.push(...group.map(stock => `${stock.code}：腾讯行情请求失败，保留旧报价`));
+      } catch (error) {
+        const failure = describeSourceFailure(error);
+        console.warn(JSON.stringify({ event: "quote_fetch_failed", source: "qt.gtimg.cn", count: group.length, failure }));
+        errors.push(...group.map(stock => `${stock.code}：腾讯行情请求失败（${failure.message}），保留旧报价`));
       }
     }
     const deadline = Date.now() + 30_000;

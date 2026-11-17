@@ -372,13 +372,13 @@ export function Dashboard({ user, onSignOut, linuxdoEnabled }: { user: Account; 
   return <BollProvider><main className={styles.shell}>
     <div className={styles.brand}><span className={styles.brandIcon}><Sprout size={22} aria-hidden="true" /></span><strong>DiviWish <span>息望</span></strong><small>每一笔股息都是未来的希望</small></div>
     <header className={styles.header}><div className={styles.headerActions}>
-      <button aria-label="刷新行情与股息" title="刷新行情与股息" onClick={() => refresh()} disabled={busy}><RefreshCw size={18} className={busy ? styles.spinning : ""} /></button>
+      {view !== "market" && <button aria-label="刷新行情与股息" title="刷新行情与股息" onClick={() => refresh()} disabled={busy}><RefreshCw size={18} className={busy ? styles.spinning : ""} /></button>}
       <button aria-label="筛选与搜索" aria-expanded={showTools} onClick={() => setShowTools(!showTools)}><Menu size={19} /></button>
       <button className={styles.addButton} aria-label="添加标的" onClick={() => setForm({ stock: null })}><CirclePlus size={18} /></button>
     </div><h1>{title}</h1></header>
 
     <div className={styles.content}><LinuxdoNotice />
-      {error && <div className={styles.error} role="alert"><span>{error}{!data && " 请在 web 目录运行 run.cmd 启动前后端。"}</span><button aria-label="关闭错误提示" onClick={() => setError("")}><X size={16} /></button></div>}
+      {error && <div className={styles.error} role="alert"><span>{view === "market" && "标的数据："}{error}{!data && " 请在 web 目录运行 run.cmd 启动前后端。"}</span><button aria-label="关闭错误提示" onClick={() => setError("")}><X size={16} /></button></div>}
       {notice && <div className={styles.notice} role="status"><Check size={16} /><span>{notice}</span><button aria-label="关闭通知" onClick={() => setNotice("")}><X size={16} /></button></div>}
 
       {showTools && <section className={styles.tools} aria-label="筛选工具"><label className={styles.search}><Search size={17} /><input aria-label="搜索股票" placeholder="搜索股票名称或代码" value={search} onChange={event => { setSearch(event.target.value); setSector("全部"); }} /></label>{marketControls}<div className={styles.toolLinks}><button onClick={() => navigate("settings")}><Settings2 size={15} />数据与设置</button></div><p className={styles.muted}>行情日期 {data?.meta.quote_date || "待获取"} · {stocks.length} 支标的 · 手动刷新后仍以行情日期为准</p></section>}

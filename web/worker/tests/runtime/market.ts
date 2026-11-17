@@ -1,8 +1,11 @@
 import { resolveMarketSelection } from "../../market-indices.ts";
 import { MarketService, parseIndexHistory } from "../../market.ts";
+import { describeSourceFailure, SourceHttpError } from "../../source-failure.ts";
 
 export async function nativeMarketTest() {
   try {
+    if (describeSourceFailure(new DOMException("runtime timeout", "TimeoutError")).kind !== "timeout" ||
+      describeSourceFailure(new SourceHttpError(503)).status !== 503) throw new Error("Native source failure classification failed");
     let now = Date.parse("2026-11-17T08:30:00Z"), fail = false, calls = 0;
     const service = new MarketService(async code => {
       calls++;
