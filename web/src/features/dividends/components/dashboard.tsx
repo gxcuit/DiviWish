@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { CalendarDays, ChartNoAxesCombined, Check, ChevronLeft, ChevronRight, Circle, CirclePlus, Database, Menu, RefreshCw, Search, Settings2, Sprout, Star, UserRound, X } from "lucide-react";
+import { Activity, CalendarDays, ChartNoAxesCombined, Check, ChevronLeft, ChevronRight, Circle, CirclePlus, Database, Menu, RefreshCw, Search, Settings2, Sprout, Star, UserRound, X } from "lucide-react";
 import type { GridSettings, Stock, StockDetail, StockPreview, StocksResponse, YieldBasisSettings } from "../types";
 import styles from "./dashboard.module.css";
 import { StockAutocomplete, type StockSuggestion } from "./stock-autocomplete";
@@ -20,10 +20,13 @@ import { BollLegend, StockBollTags } from "./stock-boll-tags";
 import { LinuxdoAccount, LinuxdoNotice } from "@/features/auth/linuxdo";
 import type { Account } from "@/features/auth/types";
 
-type View = "discovery" | "watchlist" | "income" | "calendar" | "settings";
+import { MarketOverview } from "../../market/market-overview";
+
+type View = "discovery" | "watchlist" | "income" | "calendar" | "settings" | "market";
 const navigation = [
   { key: "discovery", label: "发现", icon: Circle },
   { key: "watchlist", label: "自选", icon: Star },
+  { key: "market", label: "市场", icon: Activity },
   { key: "income", label: "收益", icon: ChartNoAxesCombined },
   { key: "calendar", label: "日历", icon: CalendarDays },
   { key: "settings", label: "我的", icon: UserRound },
@@ -281,7 +284,7 @@ export function Dashboard({ user, onSignOut, linuxdoEnabled }: { user: Account; 
     api<StocksResponse>("/stocks").then(response => { if (active) setData(response); }).catch(failure => { if (active) setError(failure.message); });
     const updateView = () => {
       const selected = new URLSearchParams(window.location.search).get("view");
-      setView(["watchlist", "income", "calendar", "settings"].includes(selected || "") ? selected as View : "discovery");
+      setView(["watchlist", "market", "income", "calendar", "settings"].includes(selected || "") ? selected as View : "discovery");
     };
     updateView();
     window.addEventListener("popstate", updateView);
@@ -385,6 +388,8 @@ export function Dashboard({ user, onSignOut, linuxdoEnabled }: { user: Account; 
         {!data && !error ? <div className={styles.empty}><RefreshCw className={styles.spinning} size={22} /><p>正在读取股息数据…</p></div> : matchingCount > 0 ? <><section className={styles.stockList} aria-label="股票列表">{filtered.map(stock => <StockRow key={stock.id} stock={stock} onOpen={openStock} onWatch={watch} />)}</section><BollLegend /></> : <div className={styles.empty}><Star size={30} /><h2>{view === "watchlist" ? "这里还没有自选股票" : "没有符合条件的股票"}</h2><p>{view === "watchlist" ? "在发现页点击星标，把关注的股息收入留在这里。" : "换一个板块或清除筛选试试。"}</p><button className={styles.primaryButton} onClick={() => { setSector("全部"); setSearch(""); setMarket("all"); if (view === "watchlist") navigate("discovery"); }}>查看全部股票</button></div>}
       </>}
 
+
+      {view === "market" && <MarketOverview />}
 
       {view === "income" && <>{marketControls}<div className={styles.summaryCards}><div><span>平均选用股息率</span><strong>{percent(average)}</strong><small>{available.length} 支有有效数据的标的</small></div><div><span>达到目标</span><strong>{allFiltered.filter(stock => stock.status === "green").length}<small> 支</small></strong><small>按你设定的目标股息率</small></div><div><span>自选标的</span><strong>{stocks.filter(stock => stock.watched).length}<small> 支</small></strong><small>保存在当前账号</small></div></div><div className={styles.sectionHeading}><h2>股息率排行</h2><select aria-label="排行排序" value={sort} onChange={event => setSort(event.target.value)}><option value="yield">按选用股息率</option><option value="percentile">按历史分位</option></select></div><section className={styles.panel}>{ranked.map((stock, index) => <button className={styles.rankRow} key={stock.id} onClick={() => openStock(stock)}><span className={styles.rankNumber}>{index + 1}</span><span className={styles.rankIdentity}><strong>{stock.name}</strong><small>{stock.instrument_type === "etf" ? "ETF" : stock.market === "HK" ? "港股" : "A股"} · {stock.sector}</small></span><span><strong>{percent(stock.selected_yield)}</strong><small>{stock.instrument_type === "etf" ? `${stock.yield_basis === "annual" ? "年度" : stock.yield_basis === "custom" ? "自定义估算" : "滚动"}派息率历史分位 ${percent(stock.percentile)}`  : `${yieldLabels[stock.yield_basis || "annual"]}历史分位 ${percent(stock.percentile)}`}</small></span><ChevronRight size={15} /></button>)}</section><h2 className={styles.subheading}>A/H 股息对比</h2><div className={styles.tableWrap}><table className={styles.gridTable}><thead><tr><th>港股标的</th><th>税前股息率</th><th>港户口径</th><th>港股通口径</th><th>A/H 溢价</th></tr></thead><tbody>{stocks.filter(stock => stock.market === "HK").map(stock => <tr key={stock.id}><th>{stock.name}</th><td>{percent(stock.dividend_yield)}</td><td>{percent(stock.hk_net_yield)}</td><td>{percent(stock.connect_yield)}</td><td>{percent(stock.ah_premium)}</td></tr>)}</tbody></table></div><p className={styles.muted}>A/H 对比固定使用年度股息率，沿用表格中的税后折算系数和汇率，不代表个人实际税负；本页不估算未录入的持仓收益。</p></>}
 

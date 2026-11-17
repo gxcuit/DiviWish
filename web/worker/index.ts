@@ -1,3 +1,4 @@
+import { MarketService } from "./market.ts";
 import { ensureEtfSector } from "./onboarding.ts";
 import { createLinuxdoAuth } from "./linuxdo.ts";
 import { createAuth, requireUser } from "./auth.ts";
@@ -11,7 +12,7 @@ import { refreshOptions, refreshStocks } from "./refresh.ts";
 import { sectorName, timestamp, validate } from "./validation.ts";
 import type { Env, Providers, Suggestion } from "./types.ts";
 
-export function createHandler(source: Providers = providers, authOptions: Parameters<typeof createAuth>[0] = {}) {
+export function createHandler(source: Providers = providers, authOptions: Parameters<typeof createAuth>[0] = {}, market = new MarketService()) {
   const bollinger = new BollingerService();
   const auth = createAuth(authOptions);
   const linuxdo = createLinuxdoAuth(authOptions);
@@ -31,6 +32,11 @@ export function createHandler(source: Providers = providers, authOptions: Parame
       if (authResponse) return authResponse;
       const user = await requireUser(request, env), db = env.DB, store = portfolio(db, user.id);
       if (method === "GET" && ["/api/stocks", "/api/sectors"].includes(path)) await ensureEtfSector(db, user.id);
+      if (path === "/api/market") {
+        if (method !== "GET") throw new HttpError(405, "请使用 GET 获取市场数据");
+        try { return json(await market.get(url.searchParams.get("refresh") === "1")); }
+        catch (failure) { throw new HttpError(502, failure instanceof Error ? failure.message : "市场数据获取失败"); }
+      }
       if (path === "/api/stocks/preview" && method === "GET") {
         const stock = validated(() => validate({ code: url.searchParams.get("code"), market: url.searchParams.get("market"), instrument_type: url.searchParams.get("instrument_type") ?? "stock", exchange: url.searchParams.get("exchange"), name: "待查询股票", sector: "未分类" }));
         stock.id = 0; // Temporary quote identity; preview never writes to the portfolio.

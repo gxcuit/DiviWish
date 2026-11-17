@@ -61,7 +61,11 @@ try {
   const forecast = await forecastResponse.json();
   assert.equal(forecastResponse.status, 200, JSON.stringify(forecast));
   assert.deepEqual(forecast, { customDividend: true, currency: true, quoteIndependent: true });
-  console.log(`Native workerd (${testDate}; production ${appDate}) passed: OAuth, D1 portfolio, dividend cache/lease, fixed per-share dividends, FX and price-independent cash. Only temporary data and simulated provider responses used.`);
+  const marketResponse = await fetch(`http://127.0.0.1:${port}/market`, { signal: AbortSignal.timeout(30_000) });
+  const market = await marketResponse.json();
+  assert.equal(marketResponse.status, 200, JSON.stringify(market));
+  assert.deepEqual(market, { market: true, window: 40, publicCache: true, staleRetention: true });
+  console.log(`Native workerd (${testDate}; production ${appDate}) passed: OAuth, D1 portfolio, dividend cache/lease, fixed per-share dividends, FX, price-independent cash and market spread/cache. Only temporary data and simulated provider responses used.`);
 } finally {
   if (child?.pid) {
     if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });

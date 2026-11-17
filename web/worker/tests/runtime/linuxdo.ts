@@ -3,6 +3,7 @@ import type { Env } from "../../types.ts";
 import { dailyDividend } from "../../dividend-cache.ts";
 import { providers } from "../../providers.ts";
 import { validate } from "../../validation.ts";
+import { nativeMarketTest } from "./market.ts";
 import { nativeCustomDividendTest } from "./custom-dividend.ts";
 
 function check(value: unknown, message: string): asserts value {
@@ -14,6 +15,7 @@ function check(value: unknown, message: string): asserts value {
 // are simulated, so no real credentials or LinuxDO accounts are involved.
 export const nativeOAuthTest = { async fetch(requestInfo: Request, env: Env) {
   if (new URL(requestInfo.url).pathname === "/health") return Response.json({ status: "ready" });
+  if (new URL(requestInfo.url).pathname === "/market") return nativeMarketTest();
   if (new URL(requestInfo.url).pathname === "/custom-dividend") return nativeCustomDividendTest(env);
   let redirectAt = "", providerCalls = 0;
   const handler = createHandler(undefined, { fetcher: async (input, init) => {
