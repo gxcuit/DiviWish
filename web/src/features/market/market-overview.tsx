@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, RefreshCw } from "lucide-react";
 import type { MarketPoint, MarketSnapshot } from "../../../worker/market-types";
 import { api } from "../dividends/api";
+import { RelativeBollChart, ValueRegressionChart } from "./market-analysis";
 import styles from "./market-overview.module.css";
 
 const ranges = [{ years: 0.5, label: "近半年" }, { years: 1, label: "近1年" }, { years: 3, label: "近3年" }, { years: 5, label: "近5年" }];
@@ -98,6 +99,8 @@ export function MarketOverview() {
         <div role="group" aria-label="图表指标" className={styles.tabs}><button aria-pressed={!returns} onClick={() => setReturns(false)}>40日收益差</button><button aria-pressed={returns} onClick={() => setReturns(true)}>指数40日涨跌幅</button></div>
         <MarketChart key={`${years}:${returns}:${data.fetched_at}`} series={visible} returns={returns} />
       </div>
+      {data.relative && <RelativeBollChart data={data.relative} />}
+      {data.regression && <ValueRegressionChart data={data.regression} />}
     </>}
     <div className={styles.method}><h3>指标怎么看</h3><p>收益差大于 0，表示红利近40个交易日的涨跌幅高于 A500；小于 0，表示红利相对落后。相对领先也可能发生在两者都下跌时。</p><p>40日涨跌幅 =（当日全收益指数收盘值 ÷ 40个交易日前收盘值 − 1）× 100%。两条指数涨跌幅相减，收益差以“百分点”展示。需要41个有效收盘值，两个指数使用相同起止日期；不按自然日计算。</p><p>全收益指数包含现金分红再投资。采用已完成交易日数据，盘中不更新当日收盘值。历史不足所选范围时展示已有数据；缺失值不会按0补齐。</p><p>数据来源：<a href="https://www.csindex.com.cn" target="_blank" rel="noreferrer">中证指数有限公司</a> · <a href="https://mp.weixin.qq.com/s/ZI1KEZ_02F5YpN1Kgl1pMg" target="_blank" rel="noreferrer">参考文章</a>{data && <><br />最近成功获取：{new Date(data.fetched_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })}（北京时间）</>}</p></div>
   </section>;

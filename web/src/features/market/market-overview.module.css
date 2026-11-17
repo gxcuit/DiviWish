@@ -62,3 +62,8 @@
   .chart { margin: 0 -3px; }
 }
 @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
+.analysisPanel { margin-top: 20px; }
+.analysisMetrics { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; padding: 15px 0 6px; color: #7b8390; font-size: 12px; font-variant-numeric: tabular-nums; }
+.analysisMetrics b { color: #394352; font-weight: 600; margin-left: 4px; }
+.chart path.bandArea { fill: #285f9f; fill-opacity: .12; stroke: none; }
+.legend i.bandSwatch { background: #285f9f20; height: 10px; border: 1px solid #285f9f30; }
