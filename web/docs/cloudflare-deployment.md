@@ -2,9 +2,19 @@
 
 主地址：**https://diviwish.shaunko.tech**；备用地址：**https://diviwish.jackgao-china.workers.dev**。
 
-当前生产版本为 `0dcbb409-f4ba-4284-b305-3172fe3f3bd9`，于 2026-11-17 12:44（Australia/Perth）从多人版 `develop` / `multi-user` 的源码提交 `f91a0ca` 发布，Worker 版本标签为 `f91a0ca`，接收100%流量。本次增加“市场”页、中证红利全收益减中证A500全收益的40个交易日收益差及交互图表。上一生产版本为 `af036c3a-0668-4ce8-b612-40d30e743494`。
+当前生产版本为 `692506d2-4d39-4595-9594-c1eaf62e1002`，于 2026-11-17 13:21（Australia/Perth）从多人版 `develop` / `multi-user` 的源码提交 `c343080` 发布，Worker版本标签为 `c343080`，接收100%流量。本次新增红利／A500全收益归一化比值的242日BOLL（±2σ）及红利全收益的对数价值回归（±1.5σ残差带）。上一生产版本为 `0dcbb409-f4ba-4284-b305-3172fe3f3bd9`。
 
 2026-10-28 首次账号版部署为 `83c32118-c504-4bb3-b944-e7022b07d27d`；自定义域名 Turnstile 修复为 `52e2b5cd-1edc-406d-98fc-2726ee710195`。2026-10-30 发布前的生产版本为 `76acf25a-657a-44f2-939f-cbbf1f9d2057`（LinuxDO 原生 fetch 修复）。
+
+## 2026-11-17：242日比值BOLL与价值回归发布验证
+
+- 功能源码：单机版 `main` / `codex/standalone` 为 `0e9945d`，多人版 `develop` / `multi-user` 为 `c343080`，四个分支均已推送。此节为部署后文档提交，实际部署源码仍为 `c343080`。
+- 两版分别通过全部116／146项回归、lint、前后端类型、webpack构建及临时SQLite HTTP检查；多人版生产配置dry-run与原生workerd检查通过。浏览器覆盖1280／390px的图表展示、范围切换、固定归一化基日与拟合区间、滑块／键盘查值、缺失预热带、历史返回及失败保留，无脚本错误或横向溢出。
+- 统一从2016年起读取官方全收益历史，大盘使用中证A500全收益。BOLL采用242个连续共同交易日、总体标准差及±2σ；价值回归在自然年时间与红利指数对数上做最小二乘，显示±1.5σ对数残差带、R²、拟合年化与按242日估算的年化波动。显示范围切换只裁剪曲线，不重新选基日或拟合。详见[计算与样例图](market.md)。
+- 无生产绑定的Cloudflare隔离预览真实取得长期历史并完成全部计算，截至2026-11-16：红利回归2641个样本，R²约0.943、拟合年化约8.38%；比值BOLL的最新%B约1.23、带宽约28.75%，与本地同一历史计算结果一致。单机服务已重启，并验证真实API含新字段。
+- 使用Wrangler `4.152.0`、`deploy --env production --keep-vars --tag c343080` 发布到现有 `diviwish`；版本 `692506d2-4d39-4595-9594-c1eaf62e1002` 接收100%流量，前后全部15项绑定与运行配置一致，未执行数据库迁移。
+- 两个生产域名的市场／登录／注册／重置页返回200，D1健康和登录配置正常；未登录的市场、股票、板块接口返回401，跨站刷新返回403。各10个实际引用的JS/CSS产物与本地SHA-256一致，确认同时含242日BOLL和价值回归。线上仅作只读核查，登录后交互使用临时账号验证，未发邮件或刷新个人股票。
+- 本次检查日志为发布工作区 `.local/market-boll-check.log`、`.local/market-boll-production-dry-run.log`、`.local/market-boll-remote-check.log`、`.local/market-boll-deploy.log` 与 `.local/market-boll-production-check.log`；版本／绑定比较保存在 `.local/market-boll-before-version.json`、`.local/market-boll-after-version.json` 与 `.local/market-boll-after-deployments.log`。所有私人配置及数据保持忽略，不提交。
 
 ## 2026-11-17：市场情况与40日收益差发布验证
 
