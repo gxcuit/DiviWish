@@ -1,10 +1,10 @@
+import { buildRelativeBands, buildValueRegression, MARKET_START, normalizedHistory } from "./market-analysis.ts";
 import type { IndexBar, MarketPoint, MarketSnapshot } from "./market-types.ts";
 
 export const MARKET_INDICES = { dividend: "H00922", a500: "000510CNY010" } as const;
 export type MarketIndex = typeof MARKET_INDICES[keyof typeof MARKET_INDICES];
 export type MarketLoader = (code: MarketIndex, start: string, end: string) => Promise<IndexBar[]>;
 const SOURCE_URL = "https://www.csindex.com.cn";
-const DAY = 86_400_000;
 const TTL = 30 * 60_000;
 
 function validDate(value: string) {
@@ -60,17 +60,8 @@ export const fetchIndexHistory: MarketLoader = async (code, start, end) => {
 };
 
 export function buildMarketSeries(dividend: IndexBar[], a500: IndexBar[], end: string): MarketPoint[] {
-  const normalize = (bars: IndexBar[]) => {
-    const values = new Map<string, number>();
-    for (const bar of bars) {
-      if (!validDate(bar.date) || !Number.isFinite(bar.close) || bar.close <= 0) throw new Error("指数历史值无效");
-      if (bar.date > end) continue;
-      if (values.has(bar.date) && values.get(bar.date) !== bar.close) throw new Error("同日指数值冲突");
-      values.set(bar.date, bar.close);
-    }
-    return values;
-  };
-  const d = normalize(dividend), a = normalize(a500);
+  const d = new Map(normalizedHistory(dividend, end).map(row => [row.date, row.close]));
+  const a = new Map(normalizedHistory(a500, end).map(row => [row.date, row.close]));
   const dates = [...new Set([...d.keys(), ...a.keys()])].sort();
   const series: MarketPoint[] = [];
   for (let i = 40; i < dates.length; i++) {
@@ -110,8 +101,8 @@ export class MarketService {
       throw new Error("中证历史服务暂不可用，请一分钟后重试");
     }
     try {
-      // Extra warm-up sessions preserve a full five-year display after the first 40-day window.
-      const start = new Date(Date.parse(end) - (366 * 5 + 100) * DAY).toISOString().slice(0, 10);
+      // A fixed history start keeps the ratio base and full-sample fit stable when display ranges change.
+      const start = MARKET_START;
       const histories = await Promise.allSettled([
         this.loader(MARKET_INDICES.dividend, start, end), this.loader(MARKET_INDICES.a500, start, end),
       ]);
@@ -122,7 +113,8 @@ export class MarketService {
       if (entry && series.at(-1)!.date < entry.snapshot.latest.date) throw new Error("数据源返回了较旧历史");
       const latest = series.at(-1)!;
       const tailMismatch = dividend.at(-1)?.date !== a500.at(-1)?.date;
-      const snapshot: MarketSnapshot = { window: 40, series, latest, fetched_at: new Date(now).toISOString(),
+      const snapshot: MarketSnapshot = { window: 40, series, latest,
+        relative: buildRelativeBands(dividend, a500, latest.date), regression: buildValueRegression(dividend, latest.date), fetched_at: new Date(now).toISOString(),
         source: "中证指数有限公司 · 全收益指数日线", source_url: SOURCE_URL, cached: false, stale: false,
         warning: tailMismatch ? "两条指数更新日期不同，当前展示最近共同交易日。" : null };
       this.entry = { time: now, end, snapshot: structuredClone(snapshot) };
