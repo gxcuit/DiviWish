@@ -1,3 +1,4 @@
+import { MarketService } from "./market.ts";
 import { initialize } from "./database.ts";
 import { BollingerService } from "./bollinger.ts";
 import { dailyDividend } from "./dividend-cache.ts";
@@ -9,7 +10,7 @@ import { refreshOptions, refreshStocks } from "./refresh.ts";
 import { sectorName, timestamp, validate } from "./validation.ts";
 import type { Env, Providers, Suggestion } from "./types.ts";
 
-export function createHandler(source: Providers = providers) {
+export function createHandler(source: Providers = providers, market = new MarketService()) {
   const bollinger = new BollingerService();
   return async function handle(request: Request, env: Env): Promise<Response> {
     try {
@@ -22,6 +23,11 @@ export function createHandler(source: Providers = providers) {
       if (path === "/api/health" && method === "GET") {
         const row = await db.prepare("SELECT count(*) AS count FROM stocks").first<{ count: number }>();
         return json({ status: "ok", database: "sqlite", mode: "standalone", count: row?.count ?? 0 });
+      }
+      if (path === "/api/market") {
+        if (method !== "GET") throw new HttpError(405, "请使用 GET 获取市场数据");
+        try { return json(await market.get(url.searchParams.get("refresh") === "1")); }
+        catch (failure) { throw new HttpError(502, failure instanceof Error ? failure.message : "市场数据获取失败"); }
       }
       if (path === "/api/stocks/preview" && method === "GET") {
         const stock = validated(() => validate({ code: url.searchParams.get("code"), market: url.searchParams.get("market"), instrument_type: url.searchParams.get("instrument_type") ?? "stock", exchange: url.searchParams.get("exchange"), name: "待查询股票", sector: "未分类" }));
