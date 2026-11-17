@@ -1,13 +1,18 @@
+import type { MarketSelection } from "./market-indices.ts";
+
 export type IndexBar = { date: string; close: number };
 export type MarketPoint = {
   date: string;
   start_date: string;
+  /** Legacy API key: the return of selected A. */
   dividend_return: number;
+  /** Legacy API key: the return of selected B. */
   a500_return: number;
   spread: number;
 };
 export type MarketSnapshot = {
   window: 40;
+  selection: MarketSelection;
   series: MarketPoint[];
   latest: MarketPoint;
   relative: RelativeSnapshot;

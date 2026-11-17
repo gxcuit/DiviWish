@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { MarketSelection } from "../../../worker/market-indices";
 import type { RegressionPoint, RegressionSnapshot, RelativePoint, RelativeSnapshot } from "../../../worker/market-types";
 import styles from "./market-overview.module.css";
 
@@ -87,27 +88,27 @@ function AnalysisChart<Row extends { date: string }>({ series, lines, band, loga
   </>;
 }
 
-export function RelativeBollChart({ data }: { data: RelativeSnapshot }) {
+export function RelativeBollChart({ data, selection }: { data: RelativeSnapshot; selection: MarketSelection }) {
   const [years, setYears] = useState(0);
   const latest = data.latest, visible = range(data.series, years);
-  const lines: Line<RelativePoint>[] = [{ label: "红利 / A500 归一化比值", color: "#285f9f", value: row => row.ratio }, { label: "MA242", color: "#d86b80", value: row => row.middle }];
+  const lines: Line<RelativePoint>[] = [{ label: `${selection.a.short_name} / ${selection.b.short_name} 归一化比值`, color: "#285f9f", value: row => row.ratio }, { label: "MA242", color: "#d86b80", value: row => row.middle }];
   return <section className={`${styles.chartPanel} ${styles.analysisPanel}`} aria-label="242日比值BOLL">
-    <div className={styles.chartHeading}><h3>红利 / A500 · 242日 BOLL</h3><RangeSelector years={years} onChange={setYears} label="BOLL时间范围" /></div>
+    <div className={styles.chartHeading}><h3>{selection.a.short_name} / {selection.b.short_name} · 242日 BOLL</h3><RangeSelector years={years} onChange={setYears} label="BOLL时间范围" /></div>
     <div className={styles.analysisMetrics}><span>最新比值 <b>{number(latest.ratio)}</b></span><span>%B <b>{number(latest.percent_b, 2)}</b></span><span>带宽 <b>{percent(latest.bandwidth)}</b></span></div>
-    <AnalysisChart key={`${years}:${data.series.length}`} series={visible} lines={lines} band={{ lower: row => row.lower, upper: row => row.upper, label: "±2σ 布林带" }} label="红利与A500比值242日BOLL曲线" readout={row => <><span>比值 {number(row.ratio)}</span><span>中轨 {number(row.middle)}</span><span>上轨 {number(row.upper)}</span><span>下轨 {number(row.lower)}</span></>} />
+    <AnalysisChart key={`${years}:${data.series.length}`} series={visible} lines={lines} band={{ lower: row => row.lower, upper: row => row.upper, label: "±2σ 布林带" }} label={`${selection.a.short_name}与${selection.b.short_name}比值242日BOLL曲线`} readout={row => <><span>比值 {number(row.ratio)}</span><span>中轨 {number(row.middle)}</span><span>上轨 {number(row.upper)}</span><span>下轨 {number(row.lower)}</span></>} />
     {latest.middle === null && <p className={styles.warning}>近期连续共同有效交易日不足242个，暂不显示当前布林带。</p>}
-    <p className={styles.caption}>统一以 {data.base_date} 为1：比值 =（红利 / 红利基值）÷（A500 / A500基值）。中轨为242日均线，上下轨为均线 ± 2倍总体标准差。%B 不截断，超过1表示在上轨之外；带宽 =（上轨 − 下轨）/ 中轨。</p>
+    <p className={styles.caption}>统一以 {data.base_date} 为1：比值 =（A / A基值）÷（B / B基值）。中轨为242日均线，上下轨为均线 ± 2倍总体标准差。%B 不截断，超过1表示在上轨之外；带宽 =（上轨 − 下轨）/ 中轨。</p>
   </section>;
 }
 
-export function ValueRegressionChart({ data }: { data: RegressionSnapshot }) {
+export function ValueRegressionChart({ data, selection }: { data: RegressionSnapshot; selection: MarketSelection }) {
   const [years, setYears] = useState(0);
   const visible = range(data.series, years);
-  const lines: Line<RegressionPoint>[] = [{ label: "中证红利全收益", color: "#285f9f", value: row => row.close }, { label: "对数拟合直线", color: "#d86b80", value: row => row.fitted, dashed: true }];
+  const lines: Line<RegressionPoint>[] = [{ label: selection.a.name, color: "#285f9f", value: row => row.close }, { label: "对数拟合直线", color: "#d86b80", value: row => row.fitted, dashed: true }];
   return <section className={`${styles.chartPanel} ${styles.analysisPanel}`} aria-label="价值回归">
-    <div className={styles.chartHeading}><h3>价值回归 · 中证红利全收益</h3><RangeSelector years={years} onChange={setYears} label="价值回归时间范围" /></div>
+    <div className={styles.chartHeading}><h3>价值回归 · {selection.a.name}</h3><RangeSelector years={years} onChange={setYears} label="价值回归时间范围" /></div>
     <div className={styles.analysisMetrics}><span>R² <b>{number(data.r_squared, 2)}</b></span><span>拟合年化 <b>{percent(data.annualized_return)}</b></span><span>年化波动 <b>{percent(data.annualized_volatility)}</b></span></div>
-    <AnalysisChart key={`${years}:${data.count}`} series={visible} lines={lines} logarithmic digits={0} band={{ lower: row => row.lower, upper: row => row.upper, label: "±1.5σ 残差带" }} label="红利全收益价值回归对数坐标曲线" readout={row => <><span>指数 {number(row.close, 2)}</span><span>拟合 {number(row.fitted, 2)}</span><span>偏离拟合 {percent(row.close / row.fitted - 1)}</span></>} />
+    <AnalysisChart key={`${years}:${data.count}`} series={visible} lines={lines} logarithmic digits={0} band={{ lower: row => row.lower, upper: row => row.upper, label: "±1.5σ 残差带" }} label={`${selection.a.name}价值回归对数坐标曲线`} readout={row => <><span>指数 {number(row.close, 2)}</span><span>拟合 {number(row.fitted, 2)}</span><span>偏离拟合 {percent(row.close / row.fitted - 1)}</span></>} />
     <p className={styles.caption}>对数纵轴 · 固定拟合区间 {data.start_date} → {data.end_date} · {data.count} 个样本。按经过的自然年拟合 ln（全收益指数），阴影为对数残差 ±1.5σ；切换范围只改变显示。年化波动按相邻交易日对数收益率及每年242日估算。全样本事后拟合会随新增数据变化，属于历史趋势参考。</p>
   </section>;
 }

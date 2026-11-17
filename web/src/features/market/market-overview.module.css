@@ -67,3 +67,8 @@
 .analysisMetrics b { color: #394352; font-weight: 600; margin-left: 4px; }
 .chart path.bandArea { fill: #285f9f; fill-opacity: .12; stroke: none; }
 .legend i.bandSwatch { background: #285f9f20; height: 10px; border: 1px solid #285f9f30; }
+.indexSelectors { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: end; padding: 16px; margin-bottom: 20px; background: white; border: 1px solid #eceef1; border-radius: 14px; }
+.indexSelectors label { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: #697484; font-size: 12px; }
+.indexSelectors select { width: 100%; min-width: 0; border: 1px solid #dfe3e9; border-radius: 8px; background: #fafbfc; padding: 10px 9px; color: #263141; font: inherit; font-size: 13px; }
+.subtract { align-self: center; color: #adb3bc; padding-top: 20px; }
+@media (max-width: 600px) { .indexSelectors { grid-template-columns: 1fr; gap: 12px; } .subtract { display: none; } .intro p { line-height: 1.7; } }
