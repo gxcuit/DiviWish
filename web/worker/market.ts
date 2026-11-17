@@ -1,6 +1,7 @@
 import { DEFAULT_MARKET_SELECTION, resolveMarketSelection, type MarketIndexCode, type MarketSelection } from "./market-indices.ts";
 import { buildRelativeBands, buildValueRegression, MARKET_START, normalizedHistory } from "./market-analysis.ts";
 import type { IndexBar, MarketPoint, MarketSnapshot } from "./market-types.ts";
+import { describeSourceFailure, SourceHttpError, type SourceFailure } from "./source-failure.ts";
 
 export const MARKET_INDICES = { dividend: "H00922", a500: "000510CNY010", low_volatility: "H20269", low_volatility_100: "H20955" } as const;
 export type MarketIndex = MarketIndexCode;
@@ -44,7 +45,7 @@ export const fetchIndexHistory: MarketLoader = async (code, start, end) => {
   const url = new URL("/csindex-home/perf/index-perf", SOURCE_URL);
   url.search = new URLSearchParams({ indexCode: code, startDate: start.replaceAll("-", ""), endDate: end.replaceAll("-", "") }).toString();
   const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Referer: `${SOURCE_URL}/` }, signal: AbortSignal.timeout(20_000) });
-  if (!response.ok) { await response.body?.cancel(); throw new Error(`中证历史服务 HTTP ${response.status}`); }
+  if (!response.ok) { await response.body?.cancel(); throw new SourceHttpError(response.status); }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("中证历史服务未返回内容");
   const chunks: Uint8Array[] = []; let size = 0;
@@ -111,11 +112,13 @@ export class MarketService {
       if (entry) return { ...structuredClone(entry.snapshot), cached: true, stale: true, warning: "数据源暂不可用，保留所选组合上次成功数据，请稍后重试。" };
       throw new Error("所选组合数据源暂不可用，请一分钟后重试");
     }
+    let failures: (SourceFailure & { index?: MarketIndex; stage: "history" | "analysis" })[] = [];
     try {
       // The shared B history is reusable across A selections; never share in-flight I/O between requests.
       const histories = await Promise.allSettled([
         this.history(selection.a.code, end, now, force), this.history(selection.b.code, end, now, force),
       ]);
+      failures = histories.flatMap((result, i) => result.status === "rejected" ? [{ ...describeSourceFailure(result.reason), index: i === 0 ? selection.a.code : selection.b.code, stage: "history" as const }] : []);
       if (histories[0].status !== "fulfilled" || histories[1].status !== "fulfilled") throw new Error("全收益指数历史获取失败");
       const a = histories[0].value, b = histories[1].value;
       const series = buildMarketSeries(a, b, end);
@@ -129,9 +132,12 @@ export class MarketService {
       this.retryAfter.delete(key);
       return snapshot;
     } catch {
+      if (!failures.length) failures = [{ kind: "data", message: "指数历史或计算结果校验异常", stage: "analysis" }];
+      console.warn(JSON.stringify({ event: "market_fetch_failed", a: selection.a.code, b: selection.b.code, failures, retained: Boolean(entry) }));
+      const reason = failures.map(failure => `${failure.index ? `${failure.index}：` : ""}${failure.message}`).join("；");
       this.retryAfter.set(key, now + 60_000);
-      if (entry) return { ...structuredClone(entry.snapshot), cached: true, stale: true, warning: "刷新失败，已保留所选组合上次成功数据；请以图中交易日期为准。" };
-      throw new Error("暂未取得可核实的所选全收益指数历史数据，请稍后重试");
+      if (entry) return { ...structuredClone(entry.snapshot), cached: true, stale: true, warning: `刷新失败（${reason}），已保留所选组合上次成功数据；请以图中交易日期为准。` };
+      throw new Error(`暂未取得可核实的所选全收益指数历史数据（${reason}），请稍后重试`);
     }
   }
 }
