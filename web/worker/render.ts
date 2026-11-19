@@ -1,4 +1,4 @@
-import { derive, yieldGrid } from "./calculations.ts";
+import { derive, selectedBasis, yieldGrid } from "./calculations.ts";
 import type { StockRecord } from "./types.ts";
 
 export function render(stock: StockRecord, records: StockRecord[], meta: Record<string, unknown>, detail = false) {
@@ -12,6 +12,8 @@ export function render(stock: StockRecord, records: StockRecord[], meta: Record<
   delete result.connect_factor;
   delete result.a_price;
   if (detail) {
+    const [customYield] = selectedBasis({ ...stock, yield_basis: "custom" }, meta.fx_rate);
+    result.custom_dividend_yield = customYield;
     result.yield_grid = yieldGrid(stock, meta.fx_rate);
     result.sell_yield_grid = yieldGrid(stock, meta.fx_rate, "sell");
   }

@@ -93,6 +93,7 @@ export interface Stock {
 }
 
 export interface StockDetail extends Stock {
+  custom_dividend_yield: number | null;
   percentile_history: { date: string; yield: number; close: number; window_status?: "overlap" | "gap" | "no_cash" | "before_first" }[];
   yield_grid: { yield: number; price: number | null; reached: boolean | null }[];
   sell_yield_grid: { yield: number; price: number | null; reached: boolean | null }[];

@@ -1,5 +1,6 @@
 import { EtfHistory } from "./etf-history";
 import { TargetYieldEditor } from "./target-yield-editor";
+import { CustomDividendMetrics } from "./custom-dividend-metrics";
 import type { StockDetail } from "../types";
 import styles from "./dashboard.module.css";
 
@@ -18,6 +19,7 @@ export function EtfDividendDetails({ stock, historyState, onRetry, onSaveTargetY
       <div><span>滚动12个月派息率</span><strong>{rate(stock.rolling_yield)}</strong><small className={styles.metricNote}>{stock.dividend_rolling_start || "待查询"} 之后至 {stock.dividend_as_of || "待查询"}，按除息日统计，排除未来分红。</small></div>
       <div><span>上一自然年每份分红</span><strong>{cash(stock.annual_dividend)}</strong></div>
       <div><span>滚动12个月每份分红</span><strong>{cash(stock.rolling_dividend)}</strong></div>
+      <CustomDividendMetrics stock={stock} />
       <TargetYieldEditor key={stock.id} stock={stock} onSave={onSaveTargetYield} />
       <div><span>目标价格（选用口径）</span><strong>{cash(stock.target_price)}</strong></div>
       <div><span>年内涨跌</span><strong>{rate(stock.year_change)}</strong><small className={styles.metricNote}>基准 {stock.year_start_date || "待获取"}，不含现金分红再投资。</small></div>
