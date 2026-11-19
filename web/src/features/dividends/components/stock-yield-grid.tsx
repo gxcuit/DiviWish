@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Grid3X3 } from "lucide-react";
 import type { GridSettings, StockDetail } from "../types";
 import styles from "./stock-tools.module.css";
-import { yieldLabels } from "./yield-basis-picker";
+import { etfYieldLabels, yieldLabels } from "./yield-basis-picker";
 
 const percentage = (value: number) => Number((value * 100).toFixed(6)).toString();
 
@@ -12,6 +12,10 @@ export function StockYieldGrid({ stock, onSave }: {
   stock: StockDetail;
   onSave: (settings: GridSettings) => Promise<void>;
 }) {
+  const etf = stock.instrument_type === "etf";
+  const labels = etf ? etfYieldLabels : yieldLabels;
+  const currency = stock.market === "HK" ? "HKD" : "CNY";
+  const unit = etf ? "份" : "股";
   const [start, setStart] = useState(percentage(stock.grid_start ?? 0.03));
   const [end, setEnd] = useState(percentage(stock.grid_end ?? 0.08));
   const [sellStart, setSellStart] = useState(percentage(stock.grid_sell_start ?? 0.04));
@@ -38,6 +42,10 @@ export function StockYieldGrid({ stock, onSave }: {
 
   return <section className={styles.gridSection} aria-label={`${stock.name}股息率网格`}>
     <h3 className={styles.heading}><Grid3X3 size={17} />股息率网格</h3>
+    <p className={styles.gridBasis}>
+      <strong>当前口径：{labels[stock.yield_basis ?? "annual"]}</strong>
+      <span>{stock.basis_dividend == null ? "股息金额待核实" : `${Number(stock.basis_dividend.toPrecision(8))} ${currency}／${unit}`}</span>
+    </p>
     <form onSubmit={save} onChange={() => { setMessage(""); setError(""); }}>
       <div className={styles.gridInputs}>
         <label>买入起始股息率（%）<input type="number" min="0.1" max="100" step="0.1" required value={start} onChange={event => setStart(event.target.value)} /></label>
@@ -57,11 +65,11 @@ export function StockYieldGrid({ stock, onSave }: {
       <h4 className={styles.gridTitle}>{title}</h4>
       <p className={styles.hint}>{hint}</p>
       <div className={styles.gridTableWrap}>
-        <table aria-label={`${stock.name}${title}股息率对应价格`}><thead><tr><th>股息率</th><th>对应价格（{stock.market === "HK" ? "HKD" : "CNY"}）</th><th>当前状态</th></tr></thead>
+        <table aria-label={`${stock.name}${title}股息率对应价格`}><thead><tr><th>股息率</th><th>对应价格（{currency}）</th><th>当前状态</th></tr></thead>
           <tbody>{(rows || []).map(row => <tr key={row.yield} className={row.reached ? styles.reached : ""}><td>{percentage(row.yield)}%</td><td>{row.price === null ? "—" : `${stock.market === "HK" ? "HK$" : "¥"}${row.price.toFixed(2)}`}</td><td>{row.reached === null ? "待核实" : row.reached ? "已达到" : "未达到"}</td></tr>)}</tbody>
         </table>
       </div>
     </div>)}
-    <p className={styles.hint}>当前采用{yieldLabels[stock.yield_basis || "annual"]}。{stock.yield_basis === "custom" ? "对应价格 = 已保存的自定义每股股息（换算至股价币种）÷ 网格股息率。" : `对应价格 = ${stock.yield_basis === "rolling" ? "滚动年度" : "年度"}${stock.instrument_type === "etf" ? "每份分红" : "每股股息"} ÷ 网格股息率；港股按汇率换算。`}按已保存设置展示，每个方向最多 201 档；结束值未对齐时止于范围内最后一格。</p>
+    <p className={styles.hint}>对应价格＝按股价币种折算的{etf ? "每份分红" : "每股股息"}÷该档股息率。每个方向最多 201 档；结束值未对齐时止于范围内最后一格。</p>
   </section>;
 }

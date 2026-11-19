@@ -17,6 +17,32 @@ test("fixed per-share dividends produce the correct yields across banks, miners 
   }
 });
 
+test("detail keeps the saved custom estimate visible while both grids use the selected dividend", async t => {
+  const f = fixture(); t.after(() => f.db.sqlite.close());
+  const path = "/api/stocks/2";
+  const initial = await (await f.request(path)).json();
+  assert.equal(initial.custom_dividend_yield, null);
+
+  for (const [yield_basis, dividend] of [["annual", 0.625], ["rolling", 0.75], ["custom", 1.25]] as const) {
+    const response = await f.request(path, "PATCH", { yield_basis, custom_dividend: 1, custom_dividend_currency: "CNY" });
+    assert.equal(response.status, 200, await response.clone().text());
+    const detail = await (await f.request(path)).json();
+    assert.equal(detail.custom_dividend, 1);
+    assert.equal(detail.custom_dividend_currency, "CNY");
+    near(detail.custom_dividend_yield, 1.25 / 8);
+    near(detail.basis_dividend, dividend);
+    near(detail.target_price, dividend / 0.05);
+    near(detail.yield_grid[0].price, dividend / 0.03);
+    near(detail.sell_yield_grid[0].price, dividend / 0.04);
+  }
+
+  assert.equal((await f.request(path, "PATCH", { custom_dividend: 0 })).status, 200);
+  const zero = await (await f.request(path)).json();
+  assert.equal(zero.custom_dividend_yield, 0);
+  assert.equal(zero.yield_grid[0].price, 0);
+  assert.equal(zero.sell_yield_grid[0].price, 0);
+});
+
 test("HKD and CNY dividends are converted exactly once and only when needed", () => {
   const hk = validate({ yield_basis: "custom", custom_dividend: 1, custom_dividend_currency: "CNY" }, sampleStocks()[1]);
   near(derive(hk, .8).selected_yield, 1 / .8 / 8); near(derive(hk, .8).basis_dividend, 1.25);
